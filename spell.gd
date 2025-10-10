@@ -7,6 +7,12 @@ extends Area3D
 var direction: Vector3 = Vector3.FORWARD # Set by the Player's _cast_spell() function
 var player_node: Node # Referencia a Player node-hoz
 
+# SIGNAL deklarálása a Camera Shake-hez (Player.gd fogadja)
+# Mivel Area3D-t használunk, a player_node-ra kell emit-elnünk, ahogy a kódodban volt, de 
+# egy SIGNAL deklarációt is érdemes lehet felvenni a script elejére, ha a Player.gd a jelet fogadja.
+# Megtartjuk az eredeti _emit_camera_shake_signal() hívást a tisztaság érdekében.
+
+
 func _ready():
 	# Csatlakoztatjuk a body_entered jelet.
 	body_entered.connect(_on_body_entered)
@@ -41,11 +47,14 @@ func _on_body_entered(body: Node3D):
 	# Ellenőrizzük, hogy az eltalált test a "zombie" csoporthoz tartozik-e.
 	if body.is_in_group("zombie"):
 		if body.has_method("take_damage"):
-			# Sebzés kiosztása a zombin
-			body.take_damage(damage)
+			
+			# KNOCKBACK LOGIKA (ÚJ): Kiszámoljuk az ütés irányát
+			var hit_direction = (body.global_position - global_position).normalized() 
+			
+			# Sebzés kiosztása a zombin (MÓDOSÍTVA: átadjuk a hit_direction-t!)
+			body.take_damage(damage, hit_direction) # <--- IDE KERÜLT A VÁLTOZTATÁS!
 	
 	# *** CAMERA SHAKE AKTIVÁLÁS ***
-	# Akkor is bekapcsoljuk a Camera Shake-et, ha falat találunk, ami ad egy "ütés" érzést.
 	_emit_camera_shake_signal()
 
 	# Despawn the spell upon hitting ANYTHING (zombie, wall, ground)
@@ -63,5 +72,5 @@ func _emit_camera_shake_signal():
 	# Ellenőrizzük, hogy a player node létezik, és be van-e állítva a jelzés fogadása (start_camera_shake metódus)
 	if player_node and player_node.has_method("start_camera_shake"):
 		# Kibocsátjuk a hit_registered signal-t, amit a Player.gd kezel
-		# Az értékek: ( 0.3 másodperc időtartam, 0.4 intenzitás )
+		# Az értékek: ( 0.2 másodperc időtartam, 0.3 intenzitás )
 		player_node.emit_signal("hit_registered", 0.2, 0.3)
