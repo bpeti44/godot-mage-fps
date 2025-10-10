@@ -14,29 +14,29 @@ extends CharacterBody3D
 
 @export var zoom_min: float = 1.0
 @export var zoom_max: float = 5.0
-@export var zoom_speed: float = 0.5	
+@export var zoom_speed: float = 0.5
 
 # -------------------------
 # VIEW MODE SETTINGS
 # -------------------------
 var is_first_person: bool = false
-const FP_CAMERA_HEIGHT: float = 2  # Kamera magassága FPS módban (2.5m)
-const FP_FORWARD_OFFSET: float = 0.0 # Enyhe eltolás előre (-Z irányba)
-const TP_CAMERA_DISTANCE: float = 4.0 # Camera distance in TP mode (Z: 4.0m) 
-const TP_BASE_ROTATION_X: float = -10.5 # Default X rotation for TP mode (Downwards tilt)
-const VIEW_LERP_SPEED: float = 8.0   # Speed of camera transition between views
+const FP_CAMERA_HEIGHT: float = 2
+const FP_FORWARD_OFFSET: float = 0.0
+const TP_CAMERA_DISTANCE: float = 4.0
+const TP_BASE_ROTATION_X: float = -10.5
+const VIEW_LERP_SPEED: float = 8.0
 
 # -------------------------
 # FOV SETTINGS
 # -------------------------
 @export var sprint_fov: float = 85.0
 const BASE_FOV: float = 75.0
-const FOV_LERP_SPEED: float = 5.0 # Speed of FOV change
+const FOV_LERP_SPEED: float = 5.0
 
 # -------------------------
 # CAMERA SHAKE
 # -------------------------
-signal hit_registered(shake_duration, shake_intensity) # Signal emitted by Spell.gd on hit
+signal hit_registered(shake_duration, shake_intensity)
 @export var default_shake_duration: float = 0.2
 @export var default_shake_intensity: float = 0.1
 var shake_timer: float = 0.0
@@ -52,21 +52,21 @@ var can_cast: bool = true
 var casting_timer: Timer = null
 var cast_animation_timer: Timer = null
 
-const SPELL_SCENE = preload("res://spell.tscn") # Ensure this path is correct
+const SPELL_SCENE = preload("res://spell.tscn")
 
 # -------------------------
 # INTERNAL VARIABLES
 # -------------------------
 var camera: Camera3D
-var rotation_x = 0.0 
-var camera_offset: float = 4.384 
+var rotation_x = 0.0
+var camera_offset: float = 4.384
 var is_sprinting = false
 var animation_player: AnimationPlayer = null
 var is_jumping = false
 var has_started_jump = false
 
 # NODE REFERENCES
-var meshes_to_hide: Array[MeshInstance3D] = [] # Lista a rejtendő mesheknek
+var meshes_to_hide: Array[MeshInstance3D] = []
 
 # ORBIT MODE VARIABLES
 var orbiting = false
@@ -74,7 +74,7 @@ var orbit_distance = 3.0
 var orbit_yaw = 0.0
 var orbit_pitch = 0.0
 
-var spell_spawn_point: Node3D = null 
+var spell_spawn_point: Node3D = null
 
 
 # -------------------------
@@ -83,33 +83,33 @@ var spell_spawn_point: Node3D = null
 func _ready():
 	camera = $Camera3D
 	camera.transform.origin.y = camera_offset
-	camera.transform.origin.z = TP_CAMERA_DISTANCE 
+	camera.transform.origin.z = TP_CAMERA_DISTANCE
 	camera.rotation_degrees.x = TP_BASE_ROTATION_X
-	
+
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-	
+
 	# Setup casting timers
 	casting_timer = Timer.new()
 	add_child(casting_timer)
 	casting_timer.one_shot = true
 	casting_timer.timeout.connect(_on_cast_cooldown_timeout)
-	
+
 	cast_animation_timer = Timer.new()
 	add_child(cast_animation_timer)
 	cast_animation_timer.one_shot = true
 	cast_animation_timer.timeout.connect(_on_cast_animation_timeout)
-	
+
 	await get_tree().process_frame
-	
+
 	# Find the spell spawn point (BoneAttachment3D)
 	spell_spawn_point = $"skeleton_mage/Rig/Skeleton3D/SpellSpawn"
-	
+
 	# *** AUTOMATIKUS MESH GYŰJTÉS ÉS KIVÉTELEZÉS ***
 	var skeleton_node = $"skeleton_mage/Rig/Skeleton3D"
 	var meshes_to_keep: Array[String] = [
-		"Skeleton_Mage_ArmLeft", 
-		"Skeleton_Mage_ArmRight", 
-		"Skeleton_Mage_LegLeft", 
+		"Skeleton_Mage_ArmLeft",
+		"Skeleton_Mage_ArmRight",
+		"Skeleton_Mage_LegLeft",
 		"Skeleton_Mage_LegRight"
 	]
 
@@ -153,7 +153,7 @@ func _unhandled_input(event):
 		for mesh in meshes_to_hide:
 			if mesh:
 				# Mutatja TP módban, elrejti FP módban
-				mesh.visible = not is_first_person 
+				mesh.visible = not is_first_person
 			
 		# Disable orbit mode when switching to FPS
 		if is_first_person:
@@ -164,8 +164,8 @@ func _unhandled_input(event):
 	# CASTING INPUT CHECK
 	if event.is_action_pressed("fire_spell") and can_cast and not orbiting:
 		_cast_spell()
-		get_viewport().set_input_as_handled() 
-		return 
+		get_viewport().set_input_as_handled()
+		return
 	
 	# Existing Orbit and Mouse Movement Input
 	if event is InputEventMouseButton:
@@ -199,7 +199,7 @@ func _unhandled_input(event):
 			camera_offset += zoom_speed
 		camera_offset = clamp(camera_offset, zoom_min, zoom_max)
 		
-		pass 
+		pass
 
 
 func _rotate_camera_fps(relative: Vector2):
@@ -235,6 +235,14 @@ func start_camera_shake(duration: float, intensity: float):
 	shake_timer = duration
 	shake_intensity_current = intensity
 
+# CSAK AZ IDŐZÍTŐT CSÖKKENTJÜK ITT, A RÁZKÓDÁST A _physics_process végzi
+func _get_camera_shake_offset(delta: float) -> Vector3:
+	if shake_timer > 0:
+		shake_timer -= delta
+		
+	return Vector3.ZERO
+
+
 # -------------------------
 # ANIMATION HELPER FUNCTION
 # -------------------------
@@ -247,7 +255,7 @@ func _play_animation(anim_name: String):
 # CASTING FUNCTIONALITY
 # -------------------------
 func _cast_spell():
-	print("--- SPELL FUNCTION STARTED ---") 
+	print("--- SPELL FUNCTION STARTED ---")
 
 	is_casting = true
 	can_cast = false
@@ -261,7 +269,7 @@ func _cast_spell():
 	var ray_direction = camera.project_ray_normal(mouse_pos)
 	
 	var query = PhysicsRayQueryParameters3D.create(ray_origin, ray_origin + ray_direction * 1000)
-	query.exclude = [get_rid()] 
+	query.exclude = [get_rid()]
 	
 	var ray_hit = get_world_3d().direct_space_state.intersect_ray(query)
 
@@ -303,52 +311,60 @@ func _on_cast_animation_timeout():
 # PHYSICS / MOVEMENT
 # -------------------------
 func _physics_process(delta):
+	
+	var has_movement_input = false
+	
 	# Prevent movement while casting
 	if is_casting:
-		move_and_slide() # Apply gravity
-		return # Skip all movement input logic
-
-	var input_dir = Vector3.ZERO
-	if Input.is_action_pressed("ui_up"):
-		input_dir.z -= 1
-	if Input.is_action_pressed("ui_down"):
-		input_dir.z += 1
-	if Input.is_action_pressed("ui_left"):
-		input_dir.x -= 1
-	if Input.is_action_pressed("ui_right"):
-		input_dir.x += 1
-
-	input_dir = input_dir.normalized()
-
-	# Sprint check
-	is_sprinting = Input.is_action_pressed("sprint")
-	var current_speed = speed * (sprint_multiplier if is_sprinting else 1.0)
-
-	# Movement relative to player rotation
-	var direction = transform.basis * input_dir
-	velocity.x = direction.x * current_speed
-	velocity.z = direction.z * current_speed
-
-	# Gravity and Jump
-	if not is_on_floor():
-		velocity.y -= 9.8 * delta
+		velocity.y -= 9.8 * delta # Apply gravity
+		move_and_slide()
+		# A kód folytatódik a kamera logikával és az animációkkal...
 	else:
-		# Landed
-		if is_jumping:
-			_play_animation("Jump_Land")
-			is_jumping = false
-			has_started_jump = false
-		velocity.y = 0
-		if Input.is_action_just_pressed("jump"):
-			velocity.y = jump_velocity
-			is_jumping = true
-			has_started_jump = false
-			_play_animation("Jump_Start")
+		# Minden mozgás input innen indul (HA NINCS CASTOLÁS)
+		var input_dir = Vector3.ZERO
+		if Input.is_action_pressed("ui_up"):
+			input_dir.z -= 1
+		if Input.is_action_pressed("ui_down"):
+			input_dir.z += 1
+		if Input.is_action_pressed("ui_left"):
+			input_dir.x -= 1
+		if Input.is_action_pressed("ui_right"):
+			input_dir.x += 1
+		
+		input_dir = input_dir.normalized()
+		
+		if input_dir.length() > 0:
+			has_movement_input = true
 
-	move_and_slide()
+		# Sprint check
+		is_sprinting = Input.is_action_pressed("sprint")
+		var current_speed = speed * (sprint_multiplier if is_sprinting else 1.0)
+
+		# Movement relative to player rotation
+		var direction = transform.basis * input_dir
+		velocity.x = direction.x * current_speed
+		velocity.z = direction.z * current_speed
+
+		# Gravity and Jump
+		if not is_on_floor():
+			velocity.y -= 9.8 * delta
+		else:
+			# Landed
+			if is_jumping:
+				_play_animation("Jump_Land")
+				is_jumping = false
+				has_started_jump = false
+			velocity.y = 0
+			if Input.is_action_just_pressed("jump"):
+				velocity.y = jump_velocity
+				is_jumping = true
+				has_started_jump = false
+				_play_animation("Jump_Start")
+
+		move_and_slide()
 	
 	# -------------------------
-	# VIEW MODE TRANSITION (FP / TP)
+	# VIEW MODE TRANSITION (FP / TP) - EZEK MINDIG LEFUTNAK
 	# -------------------------
 	var target_camera_offset_vec: Vector3
 	var target_rotation_x_deg: float
@@ -358,12 +374,12 @@ func _physics_process(delta):
 		# FP MODE
 		target_camera_offset_vec = Vector3(0, FP_CAMERA_HEIGHT, 0)
 		target_rotation_x_deg = rotation_x # Vertical mouse look (up/down)
-		target_z_offset = FP_FORWARD_OFFSET 
+		target_z_offset = FP_FORWARD_OFFSET
 	else:
 		# TP MODE
 		target_camera_offset_vec = Vector3(0, camera_offset, 0)
 		target_rotation_x_deg = rotation_x + TP_BASE_ROTATION_X # Add base tilt (-10.5 deg)
-		target_z_offset = TP_CAMERA_DISTANCE 
+		target_z_offset = TP_CAMERA_DISTANCE
 	
 	# Smoothly transition camera position (Y offset)
 	camera.transform.origin.y = lerp(camera.transform.origin.y, target_camera_offset_vec.y, delta * VIEW_LERP_SPEED)
@@ -376,53 +392,64 @@ func _physics_process(delta):
 	# -------------------------
 	
 	# -------------------------
-	# DYNAMIC FOV SWITCH
+	# DYNAMIC FOV SWITCH - EZ IS MINDIG LEFUT
 	# -------------------------
-	var target_fov = BASE_FOV 
+	var target_fov = BASE_FOV
 	
 	if is_sprinting:
-		target_fov = sprint_fov 
+		target_fov = sprint_fov
 	
 	camera.fov = lerp(camera.fov, target_fov, delta * FOV_LERP_SPEED)
 	# -------------------------
 	
 	# -------------------------
-	# CAMERA SHAKE APPLICATION
+	# CAMERA SHAKE APPLICATION (JAVÍTVA: VISSZAÁLLÍTÁS LERPPEL)
 	# -------------------------
+	
+	# Futattjuk a shake időzítőt
+	_get_camera_shake_offset(delta)
+	
 	if shake_timer > 0:
-		shake_timer -= delta
+		# A shake erőssége csillapodik a hátralévő idővel
+		var shake_power = shake_intensity_current * (shake_timer / default_shake_duration)
 		
-		var shake_offset = Vector3.ZERO
-		shake_offset.x = randf_range(-shake_intensity_current, shake_intensity_current)
-		shake_offset.y = randf_range(-shake_intensity_current, shake_intensity_current)
+		# 1. Pozíció eltolás (X tengely)
+		var pos_shake_x = randf_range(-1.0, 1.0) * shake_power
+		camera.transform.origin.x += pos_shake_x
 		
-		# Apply offset (adds to the existing camera origin)
-		camera.transform.origin.x += shake_offset.x * (shake_timer / default_shake_duration)
-		camera.transform.origin.y += shake_offset.y * (shake_timer / default_shake_duration)
+		# 2. Rotáció eltolás (Z tengely a képernyő billegtetésére)
+		var roll_shake_z = randf_range(-0.5, 0.5) * shake_power
+		camera.rotation_degrees.z = roll_shake_z
 	else:
-		# If no shake, smoothly return X origin to 0.0
-		if abs(camera.transform.origin.x) > 0.01:
-			camera.transform.origin.x = lerp(camera.transform.origin.x, 0.0, delta * 10.0)
-		# The Y origin is already handled by the view transition logic above
+		# HA NINCS RÁZKÓDÁS, MINDEN ELTOLT TENGELYT VISSZASIMÍTUNK 0-RA
 		
-
+		# 1. X tengely visszaállítása a 0.0 kiindulópontra (a középvonalra)
+		camera.transform.origin.x = lerp(camera.transform.origin.x, 0.0, delta * 20.0)
+		
+		# 2. Z rotáció visszaállítása a 0.0 kiindulópontra (a billegtetés megszüntetése)
+		camera.rotation_degrees.z = lerp(camera.rotation_degrees.z, 0.0, delta * 20.0)
+		
+		# Az Y tengely (magasság) a VIEW_MODE_TRANSITION által már megfelelően kezelve van.
+	
 	# -------------------------
-	# ANIMATION HANDLING
+	
+	# -------------------------
+	# ANIMATION HANDLING 
 	# -------------------------
 	if animation_player:
 		# Casting animation has the highest priority
 		if is_casting:
-			return 
+			return
 
 		# Handle jump state next
 		if is_jumping:
 			if not has_started_jump and not animation_player.is_playing():
 				_play_animation("Jump_Idle")
 				has_started_jump = true
-			return 
+			return
 
 		# Movement animations
-		if input_dir.length() > 0:
+		if has_movement_input:
 			if is_sprinting:
 				_play_animation("Running_A")
 			else:
