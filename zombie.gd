@@ -4,21 +4,29 @@ extends CharacterBody3D
 # STATS
 # -------------------------
 @export var max_health: int = 100
-@export var damage_on_hit: int = 10 # Zombie's damage (ha később támadni fog)
-var current_health: int = 0 # Initialized in _ready()
+@export var damage_on_hit: int = 10 
+var current_health: int = 0 
 
-signal zombie_died(zombie_position) 
+signal zombie_died(zombie_position)
 
+# -------------------------
+# COMBAT FEEL / KNOCKBACK
+# -------------------------
+@export var knockback_strength: float = 32.0  # Initial impulse strength
+@export var stun_duration: float = 0.2	 # Duration of the knockback impulse
+@export var knockback_decay: float = 0.1 # Decay factor for the knockback vector (lower value = slower decay)
+var knockback_vector: Vector3 = Vector3.ZERO
+var knockback_timer: float = 0.0
 
 # -------------------------
 # MOVEMENT SETTINGS
 # -------------------------
-@export var speed: float = 3.0           # Zombie movement speed
-@export var rotation_speed: float = 5.0  # Rotation interpolation speed
-@export var gravity: float = 9.8         # Gravity magnitude
+@export var speed: float = 3.0	 	 	
+@export var rotation_speed: float = 5.0	
+@export var gravity: float = 9.8		
 
 # ZOMBIE STATES
-enum State {CHASE, IDLE}
+enum State {CHASE, IDLE, STUNNED} 
 var current_state: State = State.CHASE
 
 # References
@@ -26,7 +34,7 @@ var player_target: CharacterBody3D = null
 var attack_zone: Area3D = null
 var animation_player: AnimationPlayer = null
 
-# HP BAR VÁLTOZÓK (ÚJ)
+# HP BAR VARIABLES
 var health_bar_mesh: MeshInstance3D = null
 var health_bar_max_scale_x: float = 0.0
 
@@ -34,66 +42,66 @@ var health_bar_max_scale_x: float = 0.0
 # READY FUNCTION
 # -------------------------
 func _ready():
-	# Initialize health
 	current_health = max_health
 	
-	# 1. Setup Attack Zone and connect signals
+	# Setup Attack Zone and connect signals
 	attack_zone = $AttackZone
 	if attack_zone:
 		attack_zone.body_entered.connect(_on_attack_zone_body_entered)
 		attack_zone.body_exited.connect(_on_attack_zone_body_exited)
 	
-	# 2. Setup Player Target (Fallback if GameManager didn't set it)
+	# Setup Player Target 
 	if not player_target:
 		var player_node = get_tree().get_first_node_in_group("player")
 		if player_node is CharacterBody3D:
 			player_target = player_node
 			
-	# 3. Setup Animation Player
+	# Setup Animation Player
 	if has_node("zombie/AnimationPlayer"):
 		animation_player = $zombie/AnimationPlayer
 	else:
 		print("FATAL ERROR: AnimationPlayer not found at path 'zombie/AnimationPlayer'!")
 	
-	# 4. Initialize State and force Run animation
+	# Initialize State and force Run animation
 	if animation_player:
 		set_state(State.CHASE)
 		animation_player.play("zombie_run/Run")
 		
-	# 5. HP BAR INITIALIZATION (ÚJ)
+	# HP BAR INITIALIZATION
 	if has_node("HealthBar/Bar"):
 		health_bar_mesh = $HealthBar/Bar
-		# Eltároljuk az eredeti skálát (ami az 1.5 volt a beállítások szerint)
-		health_bar_max_scale_x = health_bar_mesh.scale.x 
+		health_bar_max_scale_x = health_bar_mesh.scale.x
 
 
 # -------------------------
-# COMBAT FUNCTIONS (HP BAR FRISSÍTÉSÉVEL)
+# COMBAT FUNCTIONS
 # -------------------------
 
-# Function called by the Spell when a collision occurs
-func take_damage(amount: int):
+func take_damage(amount: int, hit_direction: Vector3):
 	current_health -= amount
 	print("Zombie took ", amount, " damage. Health: ", current_health)
 	
-	# HP BAR FRISSÍTÉS (ÚJ KÓD)
+	# Apply knockback impulse
+	knockback_timer = stun_duration
+	
+	# Flatten the hit_direction to ensure pure horizontal knockback
+	var flat_hit_direction = Vector3(hit_direction.x, 0, hit_direction.z).normalized()
+	
+	# Set knockback vector: Moves the zombie AWAY from the hit source (opposite of the inverted vector)
+	knockback_vector = flat_hit_direction * knockback_strength
+	
+	# Update HP Bar
 	if health_bar_mesh:
 		var health_ratio = float(current_health) / float(max_health)
 		var new_scale_x = health_bar_max_scale_x * health_ratio
-		
-		# Skálázás
 		health_bar_mesh.scale.x = new_scale_x
-		
-		# HA a bar középpontja a zombi feje felett van, akkor a skálázás középről történik.
-		# A pozíciót csak akkor kell módosítani, ha a sávot balról akarjuk fixálni. 
-		# Ha középről csökken, ez a legegyszerűbb.
 
 	if current_health <= 0:
 		_die()
 
 func _die():
 	print("Zombie died!")
-	emit_signal("zombie_died", global_position) # <-- Ez a kulcs!
+	emit_signal("zombie_died", global_position)
 	queue_free()
 
 # -------------------------
@@ -112,17 +120,25 @@ func set_state(new_state: State):
 		State.IDLE:
 			if animation_player:
 				_play_animation("zombie_idle/Idle")
+		State.STUNNED:
+			# State not used for movement, animation handled by physics logic if needed
+			pass
 
 # -------------------------
 # PHYSICS / MOVEMENT
 # -------------------------
 func _physics_process(delta):
 	
-	# 1. GRAVITY AND VERTICAL STABILIZATION
+	# 1. Apply Gravity
 	if not is_on_floor():
 		velocity.y -= gravity * delta
 	
-	# MOVEMENT AND ROTATION LOGIC
+	
+	# 2. Normal Movement and Rotation Logic (Always runs)
+	
+	velocity.x = 0
+	velocity.z = 0
+	
 	if player_target:
 		var target_position = player_target.global_position
 		var current_position = global_position
@@ -130,27 +146,36 @@ func _physics_process(delta):
 		var distance_vector = target_position - current_position
 		var direction: Vector3 = Vector3.ZERO
 		
-		# Calculate the normalized direction vector towards the player
 		if distance_vector.length_squared() > 0.0001:
 			direction = distance_vector.normalized()
-			direction.y = 0 
+			direction.y = 0
 		
-		# 2. ROTATION: Smoothly look at the target
-		if direction.length_squared() > 0.0001:
-			var target_transform = global_transform.looking_at(target_position, Vector3.UP, true)
-			global_transform = global_transform.interpolate_with(target_transform, rotation_speed * delta)
+		# Rotation
+		if current_state == State.CHASE or current_state == State.IDLE:
+			if direction.length_squared() > 0.0001:
+				var target_transform = global_transform.looking_at(target_position, Vector3.UP, true)
+				global_transform = global_transform.interpolate_with(target_transform, rotation_speed * delta)
 		
 		
-		# 3. VELOCITY APPLICATION
+		# Velocity Application
 		if current_state == State.CHASE:
 			velocity.x = direction.x * speed
 			velocity.z = direction.z * speed
-		
-		elif current_state == State.IDLE:
-			velocity.x = 0
-			velocity.z = 0
 	
-	# Apply the movement vector
+	
+	# 3. Additive Knockback Impulse
+	if knockback_timer > 0:
+		knockback_timer -= delta
+		
+		# Decay the knockback vector for smooth deceleration
+		knockback_vector = knockback_vector.lerp(Vector3.ZERO, knockback_decay)
+		
+		# Add the knockback force to the normal velocity
+		velocity.x += knockback_vector.x 
+		velocity.z += knockback_vector.z
+			
+	
+	# Final physics application
 	move_and_slide()
 
 # -------------------------
@@ -166,10 +191,10 @@ func _play_animation(name: String):
 
 # Player ENTERS the zone: STOP the zombie (IDLE state)
 func _on_attack_zone_body_entered(body: Node3D):
-	if body.is_in_group("player"):
+	if body.is_in_group("player") and current_state != State.STUNNED:
 		set_state(State.IDLE)
 
 # Player EXITS the zone: START the zombie again (CHASE state)
 func _on_attack_zone_body_exited(body: Node3D):
-	if body.is_in_group("player"):
+	if body.is_in_group("player") and current_state != State.STUNNED:
 		set_state(State.CHASE)
