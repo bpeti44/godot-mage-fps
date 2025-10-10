@@ -5,35 +5,30 @@ extends Area3D
 @export var lifetime: float = 3.0 # Duration before the spell despawns
 
 var direction: Vector3 = Vector3.FORWARD # Set by the Player's _cast_spell() function
-var player_node: Node # Referencia a Player node-hoz
-
-# SIGNAL deklarálása a Camera Shake-hez (Player.gd fogadja)
-# Mivel Area3D-t használunk, a player_node-ra kell emit-elnünk, ahogy a kódodban volt, de 
-# egy SIGNAL deklarációt is érdemes lehet felvenni a script elejére, ha a Player.gd a jelet fogadja.
-# Megtartjuk az eredeti _emit_camera_shake_signal() hívást a tisztaság érdekében.
+var player_node: Node # Reference to the Player node
 
 
 func _ready():
-	# Csatlakoztatjuk a body_entered jelet.
+	# Connect the body_entered signal
 	body_entered.connect(_on_body_entered)
 	
-	# Megpróbáljuk megtalálni a Player node-ot a 'Player' csoport alapján
+	# Find the Player node reference
 	player_node = get_tree().get_first_node_in_group("player")
 	
-	# Időzítő indítása az élettartamhoz (Feltételezzük, hogy a Timer node létezik)
+	# Start timer for the spell's lifetime (assuming a Timer node exists)
 	var timer_node = $Timer
 	if timer_node:
 		timer_node.start(lifetime)
 	
-	# KRITIKUS FIX: Az azonnali ütközés elkerülése a Playerrel.
+	# CRITICAL FIX: Prevent immediate collision with the Player upon spawning
 	
-	# 1. Kikapcsoljuk az Area3D monitorozását (így nem érzékel ütközést).
+	# 1. Disable Area3D monitoring
 	monitoring = false
 	
-	# 2. Várjunk egy rövid időt (pl. 0.05 másodperc), amíg a lövedék elindul.
+	# 2. Wait a short time (e.g., 0.05 seconds) for the spell to move away from the spawn point
 	await get_tree().create_timer(0.05).timeout
 	
-	# 3. Visszakapcsoljuk az Area3D monitorozását. Innentől kezdve érzékelni fogja az ütközéseket.
+	# 3. Re-enable Area3D monitoring to detect collisions
 	monitoring = true
 	
 
@@ -44,17 +39,18 @@ func _physics_process(delta):
 # SIGNAL HANDLER: Called when the Area3D enters another Body
 func _on_body_entered(body: Node3D):
 	
-	# Ellenőrizzük, hogy az eltalált test a "zombie" csoporthoz tartozik-e.
+	# Check if the hit body belongs to the "zombie" group
 	if body.is_in_group("zombie"):
 		if body.has_method("take_damage"):
 			
-			# KNOCKBACK LOGIKA (ÚJ): Kiszámoljuk az ütés irányát
-			var hit_direction = (body.global_position - global_position).normalized() 
+			# KNOCKBACK LOGIC: Calculate the direction of the impact (from spell to target)
+			# This vector is used by the zombie to push itself away.
+			var hit_direction = (body.global_position - global_position).normalized()
 			
-			# Sebzés kiosztása a zombin (MÓDOSÍTVA: átadjuk a hit_direction-t!)
-			body.take_damage(damage, hit_direction) # <--- IDE KERÜLT A VÁLTOZTATÁS!
+			# Apply damage to the zombie (passing the hit_direction for knockback)
+			body.take_damage(damage, hit_direction)
 	
-	# *** CAMERA SHAKE AKTIVÁLÁS ***
+	# Activate camera shake on the Player
 	_emit_camera_shake_signal()
 
 	# Despawn the spell upon hitting ANYTHING (zombie, wall, ground)
@@ -69,8 +65,8 @@ func _on_Timer_timeout():
 # CAMERA SHAKE SIGNAL EMISSION
 # -------------------------
 func _emit_camera_shake_signal():
-	# Ellenőrizzük, hogy a player node létezik, és be van-e állítva a jelzés fogadása (start_camera_shake metódus)
+	# Check if the player node exists and has the method (i.e., is listening for the signal)
 	if player_node and player_node.has_method("start_camera_shake"):
-		# Kibocsátjuk a hit_registered signal-t, amit a Player.gd kezel
-		# Az értékek: ( 0.2 másodperc időtartam, 0.3 intenzitás )
+		# Emit the hit_registered signal to the Player node
+		# Values: ( 0.2 seconds duration, 0.3 intensity )
 		player_node.emit_signal("hit_registered", 0.2, 0.3)

@@ -104,7 +104,7 @@ func _ready():
 	# Find the spell spawn point (BoneAttachment3D)
 	spell_spawn_point = $"skeleton_mage/Rig/Skeleton3D/SpellSpawn"
 
-	# *** AUTOMATIKUS MESH GYŰJTÉS ÉS KIVÉTELEZÉS ***
+	# Automatic mesh collection and exclusion for FP view
 	var skeleton_node = $"skeleton_mage/Rig/Skeleton3D"
 	var meshes_to_keep: Array[String] = [
 		"Skeleton_Mage_ArmLeft",
@@ -113,20 +113,18 @@ func _ready():
 		"Skeleton_Mage_LegRight"
 	]
 
-	# Rekurzívan gyűjtjük az összes MeshInstance3D-t
+	# Recursively collect all MeshInstance3D nodes
 	for child in skeleton_node.get_children():
-		# A fejet külön kell kezelni, mert az egy "head" nevű BoneAttachment alatt van
+		# Handle the head attached under a 'head' BoneAttachment
 		if child.name == "head" and child is Node:
 			for head_child in child.get_children():
 				if head_child is MeshInstance3D and head_child.name not in meshes_to_keep:
 					meshes_to_hide.append(head_child)
 		
-		# Minden más, ami a Skeleton3D közvetlen gyereke
+		# All other direct children of Skeleton3D
 		if child is MeshInstance3D and child.name not in meshes_to_keep:
 			meshes_to_hide.append(child)
 			
-	# **************************************************
-
 	# Find the AnimationPlayer
 	if has_node("Skeleton_Mage/AnimationPlayer"):
 		animation_player = $Skeleton_Mage/AnimationPlayer
@@ -149,10 +147,9 @@ func _unhandled_input(event):
 	if event.is_action_pressed("toggle_view"):
 		is_first_person = not is_first_person
 		
-		# Rejtés: A korábban összegyűjtött mesheket kapcsoljuk ki/be
+		# Hide/show meshes: Show in TP mode, hide in FP mode
 		for mesh in meshes_to_hide:
 			if mesh:
-				# Mutatja TP módban, elrejti FP módban
 				mesh.visible = not is_first_person
 			
 		# Disable orbit mode when switching to FPS
@@ -161,7 +158,7 @@ func _unhandled_input(event):
 		get_viewport().set_input_as_handled()
 		return
 
-	# CASTING INPUT CHECK
+	# Casting input check
 	if event.is_action_pressed("fire_spell") and can_cast and not orbiting:
 		_cast_spell()
 		get_viewport().set_input_as_handled()
@@ -178,7 +175,7 @@ func _unhandled_input(event):
 				rotation.y = orbit_yaw
 				rotation_x = orbit_pitch
 				
-				# IMPORTANT: In TP mode, we must restore the base tilt after orbit is disabled
+				# Restore the base tilt (TP) or vertical rotation (FP) after orbit is disabled
 				if not is_first_person:
 					camera.rotation_degrees.x = rotation_x + TP_BASE_ROTATION_X
 				else:
@@ -203,15 +200,14 @@ func _unhandled_input(event):
 
 
 func _rotate_camera_fps(relative: Vector2):
-	# This rotates the whole player (Y-axis)
+	# Rotates the whole player (Y-axis)
 	rotate_y(deg_to_rad(-relative.x * mouse_sensitivity))
 	
-	# This stores the vertical mouse movement
+	# Stores the vertical mouse movement (pitch)
 	rotation_x += -relative.y * mouse_sensitivity
 	rotation_x = clamp(rotation_x, -90, 90)
 	
-	# NOTE: camera.rotation_degrees.x is NOT set here.
-	# It is set in _physics_process to enable smooth LERP transition and add TP_BASE_ROTATION_X.
+	# Actual camera pitch is set in _physics_process for LERPing
 
 
 func _rotate_camera_orbit(relative: Vector2):
@@ -235,7 +231,7 @@ func start_camera_shake(duration: float, intensity: float):
 	shake_timer = duration
 	shake_intensity_current = intensity
 
-# CSAK AZ IDŐZÍTŐT CSÖKKENTJÜK ITT, A RÁZKÓDÁST A _physics_process végzi
+# Only decrease the timer here; the shake itself is applied in _physics_process
 func _get_camera_shake_offset(delta: float) -> Vector3:
 	if shake_timer > 0:
 		shake_timer -= delta
@@ -316,11 +312,11 @@ func _physics_process(delta):
 	
 	# Prevent movement while casting
 	if is_casting:
-		velocity.y -= 9.8 * delta # Apply gravity
+		# Apply gravity while casting
+		velocity.y -= 9.8 * delta 
 		move_and_slide()
-		# A kód folytatódik a kamera logikával és az animációkkal...
 	else:
-		# Minden mozgás input innen indul (HA NINCS CASTOLÁS)
+		# Movement input processing
 		var input_dir = Vector3.ZERO
 		if Input.is_action_pressed("ui_up"):
 			input_dir.z -= 1
@@ -364,7 +360,7 @@ func _physics_process(delta):
 		move_and_slide()
 	
 	# -------------------------
-	# VIEW MODE TRANSITION (FP / TP) - EZEK MINDIG LEFUTNAK
+	# VIEW MODE TRANSITION (FP / TP) - ALWAYS RUNS
 	# -------------------------
 	var target_camera_offset_vec: Vector3
 	var target_rotation_x_deg: float
@@ -389,10 +385,9 @@ func _physics_process(delta):
 	
 	# Smoothly transition X rotation (pitch)
 	camera.rotation_degrees.x = lerp(camera.rotation_degrees.x, target_rotation_x_deg, delta * VIEW_LERP_SPEED)
-	# -------------------------
 	
 	# -------------------------
-	# DYNAMIC FOV SWITCH - EZ IS MINDIG LEFUT
+	# DYNAMIC FOV SWITCH - ALWAYS RUNS
 	# -------------------------
 	var target_fov = BASE_FOV
 	
@@ -400,41 +395,36 @@ func _physics_process(delta):
 		target_fov = sprint_fov
 	
 	camera.fov = lerp(camera.fov, target_fov, delta * FOV_LERP_SPEED)
-	# -------------------------
 	
 	# -------------------------
-	# CAMERA SHAKE APPLICATION (JAVÍTVA: VISSZAÁLLÍTÁS LERPPEL)
+	# CAMERA SHAKE APPLICATION
 	# -------------------------
 	
-	# Futattjuk a shake időzítőt
+	# Run the shake timer
 	_get_camera_shake_offset(delta)
 	
 	if shake_timer > 0:
-		# A shake erőssége csillapodik a hátralévő idővel
+		# Shake power decays with remaining time
 		var shake_power = shake_intensity_current * (shake_timer / default_shake_duration)
 		
-		# 1. Pozíció eltolás (X tengely)
+		# 1. Position offset (X-axis)
 		var pos_shake_x = randf_range(-1.0, 1.0) * shake_power
 		camera.transform.origin.x += pos_shake_x
 		
-		# 2. Rotáció eltolás (Z tengely a képernyő billegtetésére)
+		# 2. Rotation offset (Z-axis for screen roll)
 		var roll_shake_z = randf_range(-0.5, 0.5) * shake_power
 		camera.rotation_degrees.z = roll_shake_z
 	else:
-		# HA NINCS RÁZKÓDÁS, MINDEN ELTOLT TENGELYT VISSZASIMÍTUNK 0-RA
+		# If no shake is active, smooth all offset axes back to zero
 		
-		# 1. X tengely visszaállítása a 0.0 kiindulópontra (a középvonalra)
+		# 1. Restore X position to 0.0 (center line)
 		camera.transform.origin.x = lerp(camera.transform.origin.x, 0.0, delta * 20.0)
 		
-		# 2. Z rotáció visszaállítása a 0.0 kiindulópontra (a billegtetés megszüntetése)
+		# 2. Restore Z rotation (roll) to 0.0
 		camera.rotation_degrees.z = lerp(camera.rotation_degrees.z, 0.0, delta * 20.0)
-		
-		# Az Y tengely (magasság) a VIEW_MODE_TRANSITION által már megfelelően kezelve van.
 	
 	# -------------------------
-	
-	# -------------------------
-	# ANIMATION HANDLING 
+	# ANIMATION HANDLING 
 	# -------------------------
 	if animation_player:
 		# Casting animation has the highest priority
