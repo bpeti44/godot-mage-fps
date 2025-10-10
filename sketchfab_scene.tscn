@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3 uid="uid://dallm28xv8jda"]
+
+[ext_resource type="PackedScene" uid="uid://ln5bisoeqix" path="res://demo/assets/models/pine_tree.glb" id="1_kmaod"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_r57si"]
+size = Vector3(15, 555, 15)
+
+[node name="Sketchfab_Scene" instance=ExtResource("1_kmaod")]
+
+[node name="StaticBody3D" type="StaticBody3D" parent="Sketchfab_model/Pine_fbx/RootNode" index="0"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Sketchfab_model/Pine_fbx/RootNode/StaticBody3D" index="0"]
+shape = SubResource("BoxShape3D_r57si")

@@ -1,0 +1,17 @@
+# Godot 4 standard .gitignore
+# Binaries
+/bin/
+/export/
+
+# Imported files (re-created by Godot)
+.godot/
+.mono/
+/export_presets.cfg
+/build/
+
+# macOS / Windows specific files
+.DS_Store
+Thumbs.db
+
+# User specific data
+*.user

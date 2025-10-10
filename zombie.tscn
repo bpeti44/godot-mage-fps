@@ -1,0 +1,48 @@
+[gd_scene load_steps=9 format=3 uid="uid://c8l1hve36d2la"]
+
+[ext_resource type="Script" uid="uid://cpim7dbbiox7p" path="res://zombie.gd" id="1_jmu02"]
+[ext_resource type="PackedScene" uid="uid://ddg3mo14rbstb" path="res://demo/assets/models/zombie.glb" id="1_uiaus"]
+[ext_resource type="AnimationLibrary" uid="uid://bou1d3rc03k8n" path="res://demo/assets/models/zombie_run.glb" id="2_roy8y"]
+[ext_resource type="AnimationLibrary" uid="uid://7vlosnknohp3" path="res://demo/assets/models/zombie_idle.glb" id="3_eseir"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_eseir"]
+height = 2.9677734
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_uiaus"]
+radius = 2.8140523
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eseir"]
+shading_mode = 0
+albedo_color = Color(0.34901962, 1, 0, 1)
+
+[sub_resource type="QuadMesh" id="QuadMesh_7nqyo"]
+material = SubResource("StandardMaterial3D_eseir")
+size = Vector2(1, 0.2)
+
+[node name="Zombie" type="CharacterBody3D" groups=["zombie"]]
+collision_mask = 15
+script = ExtResource("1_jmu02")
+
+[node name="zombie" parent="." instance=ExtResource("1_uiaus")]
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="zombie"]
+libraries = {
+&"zombie_idle": ExtResource("3_eseir"),
+&"zombie_run": ExtResource("2_roy8y")
+}
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6843491, 0)
+shape = SubResource("CapsuleShape3D_eseir")
+
+[node name="AttackZone" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AttackZone"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8798573, 0)
+shape = SubResource("SphereShape3D_uiaus")
+
+[node name="HealthBar" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0)
+
+[node name="Bar" type="MeshInstance3D" parent="HealthBar"]
+mesh = SubResource("QuadMesh_7nqyo")

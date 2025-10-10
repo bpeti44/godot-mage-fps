@@ -1,0 +1,27 @@
+[gd_scene load_steps=5 format=3 uid="uid://bko4t6rq65cjp"]
+
+[ext_resource type="Script" uid="uid://b7yf36p1jm1cq" path="res://spell.gd" id="1_35i8j"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cmwj5"]
+albedo_color = Color(1, 1, 0.05882353, 0.68235296)
+
+[sub_resource type="SphereMesh" id="SphereMesh_p3h5g"]
+material = SubResource("StandardMaterial3D_cmwj5")
+radius = 0.2
+height = 0.2
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_b6hl1"]
+radius = 0.2
+
+[node name="Spell" type="Area3D"]
+script = ExtResource("1_35i8j")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("SphereMesh_p3h5g")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_b6hl1")
+
+[node name="Timer" type="Timer" parent="."]
+
+[connection signal="timeout" from="Timer" to="." method="_on_timer_timeout"]
