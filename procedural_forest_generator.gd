@@ -186,8 +186,8 @@ func _spawn_tree(pos: Vector3):
 	# Random rotation
 	tree.rotation.y = randf() * TAU
 
-	# Slight random scale variation
-	var scale_var = randf_range(0.8, 1.2)
+	# Large trees with significant size variation (3x to 12x original size)
+	var scale_var = randf_range(3.0, 12.0)
 	tree.scale = Vector3(scale_var, scale_var, scale_var)
 
 	add_child(tree)
