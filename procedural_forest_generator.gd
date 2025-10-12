@@ -8,6 +8,7 @@ extends Node3D
 # Paths can branch and wind organically
 
 @export var world_size: Vector2 = Vector2(200, 200)
+@export var world_offset: Vector2 = Vector2(-100, -100)  # Offset so (0,0,0) is in the center
 @export var path_width: float = 8.0
 @export var tree_density: float = 0.01  # Trees per square meter in forest areas
 @export var min_tree_spacing: float = 8.0
@@ -44,6 +45,11 @@ func _ready():
 			print("ProceduralForestGenerator: Got Terrain3DData reference")
 		else:
 			print("ProceduralForestGenerator: WARNING - Could not get Terrain3DData")
+
+		# Ensure collision is enabled
+		if terrain.has_method("set_collision_enabled"):
+			terrain.set_collision_enabled(true)
+			print("ProceduralForestGenerator: Enabled terrain collision")
 	else:
 		print("ProceduralForestGenerator: WARNING - Terrain3D node not found")
 
@@ -94,10 +100,30 @@ func _initialize_path_map():
 			path_map[y][x] = false
 
 func _generate_paths():
-	# Generate main path
-	_generate_single_path(Vector2(world_size.x * 0.1, world_size.y * 0.5),
-	                       Vector2(world_size.x * 0.9, world_size.y * 0.5),
-	                       path_segments)
+	# Find player position (assuming player spawns at world origin)
+	var player_spawn = Vector2(world_size.x * 0.5, world_size.y * 0.5)  # Center of world in grid space
+
+	# Try to find actual player node
+	var player = get_node_or_null("../Player")
+	if player:
+		# Convert world position to grid position
+		var world_pos = Vector2(player.global_position.x, player.global_position.z)
+		player_spawn = world_pos - world_offset  # Remove offset to get grid coordinates
+		print("ProceduralForestGenerator: Found player at world (%f, %f), grid (%f, %f)" % [world_pos.x, world_pos.y, player_spawn.x, player_spawn.y])
+	else:
+		print("ProceduralForestGenerator: Player not found, using center position")
+
+	# Ensure player spawn is within world bounds (grid space)
+	player_spawn.x = clamp(player_spawn.x, 0, world_size.x - 1)
+	player_spawn.y = clamp(player_spawn.y, 0, world_size.y - 1)
+
+	# Generate main path starting from player position
+	var main_path_end = Vector2(
+		randf_range(world_size.x * 0.7, world_size.x * 0.9),
+		randf_range(world_size.y * 0.3, world_size.y * 0.7)
+	)
+	_generate_single_path(player_spawn, main_path_end, path_segments)
+	print("ProceduralForestGenerator: Main path from player (%f, %f) to (%f, %f)" % [player_spawn.x, player_spawn.y, main_path_end.x, main_path_end.y])
 
 	# Generate branch paths
 	var branches_created = 0
@@ -195,7 +221,7 @@ func _generate_heightmap():
 
 			# If this is a path, flatten it (low height)
 			if path_map[y][x]:
-				height = 2.0  # Paths at low, flat elevation
+				height = 0.0  # Paths at ground level (0m) so player spawns on them
 
 			height_map[y][x] = height
 
@@ -212,7 +238,8 @@ func _generate_heightmap():
 		var heights_set = 0
 		for y in range(grid_height):
 			for x in range(grid_width):
-				var pos = Vector3(x, 0, y)
+				# Apply world offset so (0,0,0) is at the center
+				var pos = Vector3(x + world_offset.x, 0, y + world_offset.y)
 				var height = height_map[y][x]
 				terrain_data.set_height(pos, height)
 				heights_set += 1
@@ -220,6 +247,11 @@ func _generate_heightmap():
 		# Update terrain maps to apply changes
 		terrain_data.update_maps()
 		print("ProceduralForestGenerator: Set %d height values" % heights_set)
+
+		# Force collision regeneration
+		if terrain.has_method("update_aabbs"):
+			terrain.update_aabbs()
+			print("ProceduralForestGenerator: Updated terrain collision")
 	else:
 		print("ProceduralForestGenerator: WARNING - Cannot apply heightmap, terrain_data not available")
 
@@ -239,7 +271,7 @@ func _smooth_height_around(center_x: int, center_y: int, radius: int):
 					var dist = sqrt(dx * dx + dy * dy)
 					var blend = clamp(dist / radius, 0.0, 1.0)
 					var current_height = height_map[ny][nx]
-					var path_height = 2.0
+					var path_height = 0.0  # Paths at ground level
 					height_map[ny][nx] = lerp(path_height, current_height, blend)
 
 func _generate_forest():
@@ -258,16 +290,11 @@ func _generate_forest():
 	while trees_placed < target_tree_count and attempts < max_attempts:
 		attempts += 1
 
-		# Random position
-		var pos = Vector3(
-			randf_range(0, world_size.x),
-			0,
-			randf_range(0, world_size.y)
-		)
+		# Random position in grid space
+		var grid_x = int(randf_range(0, world_size.x))
+		var grid_z = int(randf_range(0, world_size.y))
 
 		# Check if on path
-		var grid_x = int(pos.x)
-		var grid_z = int(pos.z)
 		if grid_z >= 0 and grid_z < path_map.size() and grid_x >= 0 and grid_x < path_map[grid_z].size():
 			if path_map[grid_z][grid_x]:
 				continue  # Skip if on path
@@ -277,13 +304,17 @@ func _generate_forest():
 			if terrain_height > 30.0:  # Don't spawn trees on mountains above 30m
 				continue
 
-			# Set tree Y position to terrain height
-			pos.y = terrain_height
+			# Convert to world position with offset
+			var pos = Vector3(
+				grid_x + world_offset.x,
+				terrain_height,
+				grid_z + world_offset.y
+			)
 
-		# Check spacing from other trees
-		if _check_tree_spacing(pos):
-			_spawn_tree(pos)
-			trees_placed += 1
+			# Check spacing from other trees
+			if _check_tree_spacing(pos):
+				_spawn_tree(pos)
+				trees_placed += 1
 
 	print("Procedural Forest: Placed %d trees out of %d target" % [trees_placed, target_tree_count])
 
@@ -339,7 +370,8 @@ func _apply_path_textures():
 				# Get height from our generated height_map
 				var terrain_height = height_map[y][x] if height_map.size() > y and height_map[y].size() > x else 0.0
 
-				var world_pos = Vector3(x, terrain_height + 0.05, y)  # Just slightly above terrain surface
+				# Apply world offset so (0,0,0) is at the center
+				var world_pos = Vector3(x + world_offset.x, terrain_height + 0.05, y + world_offset.y)
 
 				# Create a flat box mesh for the path
 				var mesh_instance = MeshInstance3D.new()
