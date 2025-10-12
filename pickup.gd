@@ -3,10 +3,10 @@ extends Area3D
 signal collected
 
 func _ready():
-	# ha a Player belép a colliderbe
+	# If the Player enters the collider
 	connect("body_entered", Callable(self, "_on_body_entered"))
 
 func _on_body_entered(body):
-	if body.name == "Player": # vagy ha group-ot adsz neki, akkor group check is lehet
+	if body.name == "Player": # Or you can use a group check if you assign it to a group
 		emit_signal("collected")
-		queue_free() # eltűnik a pickup
+		queue_free() # The pickup disappears

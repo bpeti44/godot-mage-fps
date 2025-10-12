@@ -1,57 +1,58 @@
-extends Node3D # Vagy a fő jeleneted gyökér csomópontjának típusa (pl. Node3D)
+extends Node3D # Or your main scene's root node type (e.g. Node3D)
 
-# Előre betöltjük a zombi jelenetet, hogy ne kelljen minden spawnoláskor tölteni
+# Preload the zombie scene to avoid loading on every spawn
 const ZOMBIE_SCENE = preload("res://zombie.tscn")
 
-# Aktív zombikat tároló lista (opcionális, de jó nyomon követni)
+# List storing active zombies (optional, but good for tracking)
 var active_zombies: Array = []
-var max_zombies: int = 1 # Beállíthatod, hány zombi legyen egyszerre a pályán
+var max_zombies: int = 1 # Set how many zombies can be on the map at once
 
-# Játékos referencia
+# Player reference
 var player_target: CharacterBody3D = null
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
-	# Keressük meg a Playert, és elmentjük a referenciáját
+	# Find the Player and save its reference
 	player_target = get_tree().get_first_node_in_group("player")
-	
+
 	if not player_target or not player_target is CharacterBody3D:
 		print("FATAL ERROR: Player node not found or not in 'player' group.")
-		return # Megállítjuk a scriptet, ha nincs player
-	
-	# Spawnoljunk egy zombit a játék indulásakor
+		return # Stop the script if player is not found
+
+	# Spawn a zombie when the game starts
 	spawn_zombie(Vector3(22, 0.5, 0))
 
 
-func spawn_zombie(position: Vector3):
-	# 1. Példányosítjuk a Zombi jelenetet
+func spawn_zombie(spawn_position: Vector3):
+	# 1. Instantiate the Zombie scene
 	var zombie_instance = ZOMBIE_SCENE.instantiate()
-	
-	# 2. Beállítjuk a pozícióját a pályán
-	zombie_instance.global_position = position
-	
-	# 3. Összekötjük a Zombi halál jelzését a _on_zombie_died függvénnyel (ÚJ)
-	# Feltételezzük, hogy a Zombi scriptben a 'signal zombie_died(zombie_position)' definiálva van
-	zombie_instance.zombie_died.connect(_on_zombie_died) 
-	
-	# 4. Beállítjuk a Player referenciát
+
+	# 2. Set the Player reference
 	zombie_instance.player_target = player_target
-	
-	# 5. Hozzáadjuk a jelenet fához
+
+	# 3. Connect the Zombie death signal to the _on_zombie_died function
+	# Assumes that 'signal zombie_died(zombie_position)' is defined in the Zombie script
+	zombie_instance.zombie_died.connect(_on_zombie_died)
+
+	# 4. Add to the scene tree
 	add_child(zombie_instance)
+
+	# 5. Set its position on the map (global_position works because it's already in the tree)
+	zombie_instance.global_position = spawn_position
+
 	active_zombies.append(zombie_instance)
 
 
-# ÚJ FÜGGVÉNY: Ezt hívja meg a Zombi, amikor meghal
+# NEW FUNCTION: Called by the Zombie when it dies
 func _on_zombie_died(zombie_position: Vector3):
-	print("Zombi megölve. Új spawnolása 1 másodperc múlva...")
-	
-	# Eltávolítjuk a listából az inaktív zombikat (a queue_free() nem távolítja el automatikusan)
-	active_zombies.clear() 
-	
-	# Opcionális késleltetés a respawn előtt (szebb látvány)
+	print("Zombie killed. Respawning in 1 second...")
+
+	# Remove inactive zombies from the list (queue_free() doesn't remove automatically)
+	active_zombies.clear()
+
+	# Optional delay before respawn (better visual experience)
 	await get_tree().create_timer(1.0).timeout
-	
-	# Spawnoljunk egy újat a meghalt zombi helyén
-	# Ha egyedi spawn helyet akarsz, cseréld le a zombie_position-t egy másik Vector3-ra.
+
+	# Spawn a new zombie at the dead zombie's position
+	# If you want a custom spawn location, replace zombie_position with another Vector3.
 	spawn_zombie(zombie_position)

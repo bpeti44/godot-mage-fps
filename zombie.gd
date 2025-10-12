@@ -181,9 +181,9 @@ func _physics_process(delta):
 # -------------------------
 # HELPER FUNCTION FOR CLEAN ANIMATION SWITCHING
 # -------------------------
-func _play_animation(name: String):
-	if animation_player and animation_player.current_animation != name:
-		animation_player.play(name)
+func _play_animation(anim_name: String):
+	if animation_player and animation_player.current_animation != anim_name:
+		animation_player.play(anim_name)
 
 # ------------------------------------
 # ATTACK ZONE SIGNAL HANDLING
