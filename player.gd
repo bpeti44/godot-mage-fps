@@ -8,6 +8,17 @@ extends CharacterBody3D
 @export var jump_velocity: float = 5.0
 
 # -------------------------
+# STAMINA SYSTEM
+# -------------------------
+@export var max_stamina: float = 100.0
+@export var stamina_drain_rate: float = 20.0  # Stamina per second while sprinting
+@export var stamina_regen_rate: float = 15.0  # Stamina per second when not sprinting
+@export var min_sprint_stamina: float = 10.0  # Minimum stamina required to start sprinting
+@export var jump_stamina_cost: float = 15.0  # Stamina cost per jump
+var current_stamina: float = 100.0
+var can_sprint: bool = true  # Prevents sprint until stamina regenerates
+
+# -------------------------
 # MOUSE / CAMERA SETTINGS
 # -------------------------
 @export var mouse_sensitivity: float = 0.1
@@ -67,6 +78,7 @@ var has_started_jump = false
 
 # NODE REFERENCES
 var meshes_to_hide: Array[MeshInstance3D] = []
+var stamina_bar: ProgressBar = null
 
 # ORBIT MODE VARIABLES
 var orbiting = false
@@ -136,6 +148,12 @@ func _ready():
 		
 	# Connect the custom signal for camera shake
 	hit_registered.connect(start_camera_shake)
+
+	# Get stamina bar reference
+	stamina_bar = $CanvasLayer/StaminaBarContainer/VBoxContainer/StaminaBar
+	if stamina_bar:
+		stamina_bar.max_value = max_stamina
+		stamina_bar.value = current_stamina
 
 
 # -------------------------
@@ -332,8 +350,32 @@ func _physics_process(delta):
 		if input_dir.length() > 0:
 			has_movement_input = true
 
-		# Sprint check
-		is_sprinting = Input.is_action_pressed("sprint")
+		# Sprint check with stamina threshold system
+		var wants_to_sprint = Input.is_action_pressed("sprint") and has_movement_input
+
+		# Check if stamina depleted - disable sprinting
+		if current_stamina <= 0:
+			can_sprint = false
+
+		# Re-enable sprinting only when stamina reaches minimum threshold
+		if current_stamina >= min_sprint_stamina:
+			can_sprint = true
+
+		# Only sprint if wants to AND has permission AND has some stamina
+		is_sprinting = wants_to_sprint and can_sprint and current_stamina > 0
+
+		# Stamina drain/regen
+		if is_sprinting:
+			current_stamina -= stamina_drain_rate * delta
+			current_stamina = max(0.0, current_stamina)
+		else:
+			current_stamina += stamina_regen_rate * delta
+			current_stamina = min(max_stamina, current_stamina)
+
+		# Update stamina bar UI
+		if stamina_bar:
+			stamina_bar.value = current_stamina
+
 		var current_speed = speed * (sprint_multiplier if is_sprinting else 1.0)
 
 		# Movement relative to player rotation
@@ -351,10 +393,11 @@ func _physics_process(delta):
 				is_jumping = false
 				has_started_jump = false
 			velocity.y = 0
-			if Input.is_action_just_pressed("jump"):
+			if Input.is_action_just_pressed("jump") and current_stamina >= jump_stamina_cost:
 				velocity.y = jump_velocity
 				is_jumping = true
 				has_started_jump = false
+				current_stamina -= jump_stamina_cost
 				_play_animation("Jump_Start")
 
 		move_and_slide()
