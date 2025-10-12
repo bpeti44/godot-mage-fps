@@ -19,6 +19,12 @@ extends Node3D
 @export var pine_tree_scene: PackedScene
 @export var tree_mix_ratio: float = 0.5  # 0.0 = all pine, 1.0 = all maple
 
+# Foliage scene references
+@export var bush_scene: PackedScene
+@export var rock_scene: PackedScene
+@export var bush_density: float = 0.02  # Bushes per square meter
+@export var rock_density: float = 0.015  # Rocks per square meter
+
 # Path generation settings
 @export var path_segments: int = 50
 @export var path_curve_strength: float = 20.0
@@ -84,6 +90,10 @@ func _ready():
 	print("ProceduralForestGenerator: Generating forest...")
 	# Generate forest
 	_generate_forest()
+
+	print("ProceduralForestGenerator: Generating foliage (bushes and rocks)...")
+	# Generate bushes and rocks
+	_generate_foliage()
 
 	print("ProceduralForestGenerator: Initialization complete!")
 
@@ -385,3 +395,63 @@ func _apply_path_textures():
 				meshes_created += 1
 
 	print("ProceduralForestGenerator: Created %d path mesh segments" % meshes_created)
+
+func _generate_foliage():
+	# Generate bushes
+	if bush_scene:
+		_spawn_foliage_type(bush_scene, bush_density, "bushes", 0.5, 2.0)
+	else:
+		print("ProceduralForestGenerator: WARNING - Bush scene not assigned")
+
+	# Generate rocks
+	if rock_scene:
+		_spawn_foliage_type(rock_scene, rock_density, "rocks", 0.3, 6.0)
+	else:
+		print("ProceduralForestGenerator: WARNING - Rock scene not assigned")
+
+func _spawn_foliage_type(scene: PackedScene, density: float, type_name: String, min_scale: float, max_scale: float):
+	var forest_area = world_size.x * world_size.y
+	var target_count = int(forest_area * density)
+	var placed = 0
+	var attempts = 0
+	var max_attempts = target_count * 5
+
+	while placed < target_count and attempts < max_attempts:
+		attempts += 1
+
+		# Random position in grid space
+		var grid_x = int(randf_range(0, world_size.x))
+		var grid_z = int(randf_range(0, world_size.y))
+
+		# Check if on path
+		if grid_z >= 0 and grid_z < path_map.size() and grid_x >= 0 and grid_x < path_map[grid_z].size():
+			if path_map[grid_z][grid_x]:
+				continue  # Skip if on path
+
+			# Get terrain height
+			var terrain_height = height_map[grid_z][grid_x] if height_map.size() > grid_z and height_map[grid_z].size() > grid_x else 0.0
+
+			# Don't spawn on mountains
+			if terrain_height > 30.0:
+				continue
+
+			# Convert to world position with offset
+			var pos = Vector3(
+				grid_x + world_offset.x,
+				terrain_height,
+				grid_z + world_offset.y
+			)
+
+			# Spawn foliage
+			var instance = scene.instantiate()
+			instance.position = pos
+			instance.rotation.y = randf() * TAU
+
+			# Random scale
+			var scale_var = randf_range(min_scale, max_scale)
+			instance.scale = Vector3(scale_var, scale_var, scale_var)
+
+			add_child(instance)
+			placed += 1
+
+	print("ProceduralForestGenerator: Placed %d %s out of %d target" % [placed, type_name, target_count])
