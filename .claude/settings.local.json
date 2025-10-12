@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__godot__stop_project",
+      "mcp__godot__run_project",
+      "mcp__godot__get_debug_output",
+      "mcp__mcp-deepwiki__deepwiki_fetch"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

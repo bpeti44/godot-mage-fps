@@ -1,0 +1,36 @@
+[gd_scene load_steps=5 format=3 uid="uid://bqwryg05t6yu2"]
+
+[ext_resource type="Script" uid="uid://dut78uyna084m" path="res://player.gd" id="1_i3pqv"]
+[ext_resource type="PackedScene" uid="uid://cpyyyo7cr8af7" path="res://skeleton_mage.tscn" id="2_hqtel"]
+[ext_resource type="Texture2D" uid="uid://bg4p70y8syp6e" path="res://demo/assets/textures/Hitmarker-PNG-File.png" id="3_sweqy"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_n766f"]
+
+[node name="Player" type="CharacterBody3D" groups=["player"]]
+transform = Transform3D(-0.9998298, 0, -0.018447153, 0, 1, 0, 0.018447153, 0, -0.9998298, 0, 0, 0)
+script = ExtResource("1_i3pqv")
+
+[node name="skeleton_mage" parent="." instance=ExtResource("2_hqtel")]
+transform = Transform3D(-0.993811, 0, 0.1110874, 0, 1, 0, -0.1110874, 0, -0.993811, 0, 0.39154267, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("BoxShape3D_n766f")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="CenterContainer" type="CenterContainer" parent="CanvasLayer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TextureRect" type="TextureRect" parent="CanvasLayer/CenterContainer"]
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
+texture = ExtResource("3_sweqy")
+expand_mode = 2
+stretch_mode = 5

@@ -28,9 +28,17 @@ extends Node3D
 var noise: FastNoiseLite
 var path_map: Array = []  # 2D grid marking path locations
 var tree_instances: Array = []
+var terrain: Terrain3D = null  # Reference to Terrain3D node
 
 func _ready():
 	print("ProceduralForestGenerator: Starting initialization...")
+
+	# Find Terrain3D node
+	terrain = get_node_or_null("../Terrain")
+	if terrain:
+		print("ProceduralForestGenerator: Found Terrain3D node")
+	else:
+		print("ProceduralForestGenerator: WARNING - Terrain3D node not found, path textures will not be applied")
 
 	# Set random seed
 	if random_seed == -1:
@@ -51,6 +59,10 @@ func _ready():
 	print("ProceduralForestGenerator: Generating paths...")
 	# Generate paths
 	_generate_paths()
+
+	print("ProceduralForestGenerator: Applying path textures...")
+	# Apply path textures to terrain
+	_apply_path_textures()
 
 	print("ProceduralForestGenerator: Generating forest...")
 	# Generate forest
@@ -192,3 +204,39 @@ func _spawn_tree(pos: Vector3):
 
 	add_child(tree)
 	tree_instances.append(pos)
+
+func _apply_path_textures():
+	# Create visual path meshes using MeshInstance3D with sandy gravel appearance
+	# This is simpler than programmatically painting Terrain3D textures
+
+	var path_material = StandardMaterial3D.new()
+	path_material.albedo_color = Color(0.7, 0.65, 0.5)  # Sandy gravel color
+	path_material.roughness = 0.9
+
+	# Load sandy_gravel texture if available
+	var sandy_texture = load("res://demo/assets/textures/sandy_gravel_02_diff_1k.jpg")
+	if sandy_texture:
+		path_material.albedo_texture = sandy_texture
+		path_material.uv1_scale = Vector3(0.5, 0.5, 0.5)  # Scale texture for detail
+
+	var meshes_created = 0
+
+	# Create mesh strips for each continuous path segment
+	for y in range(path_map.size()):
+		for x in range(path_map[y].size()):
+			if path_map[y][x]:  # If this is a path
+				var world_pos = Vector3(x, 0.1, y)  # Slightly above ground
+
+				# Create a small plane mesh at this location
+				var mesh_instance = MeshInstance3D.new()
+				var plane_mesh = PlaneMesh.new()
+				plane_mesh.size = Vector2(1.0, 1.0)  # 1x1 meter quad
+				mesh_instance.mesh = plane_mesh
+				mesh_instance.material_override = path_material
+				mesh_instance.position = world_pos
+				mesh_instance.rotation.x = 0  # Flat on ground
+
+				add_child(mesh_instance)
+				meshes_created += 1
+
+	print("ProceduralForestGenerator: Created %d path mesh segments" % meshes_created)
