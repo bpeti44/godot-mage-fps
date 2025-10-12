@@ -27,8 +27,10 @@ extends Node3D
 # Internal variables
 var noise: FastNoiseLite
 var path_map: Array = []  # 2D grid marking path locations
+var height_map: Array = []  # 2D grid storing terrain heights
 var tree_instances: Array = []
 var terrain: Terrain3D = null  # Reference to Terrain3D node
+var terrain_data = null  # Reference to Terrain3DData
 
 func _ready():
 	print("ProceduralForestGenerator: Starting initialization...")
@@ -37,8 +39,13 @@ func _ready():
 	terrain = get_node_or_null("../Terrain")
 	if terrain:
 		print("ProceduralForestGenerator: Found Terrain3D node")
+		terrain_data = terrain.get_data()
+		if terrain_data:
+			print("ProceduralForestGenerator: Got Terrain3DData reference")
+		else:
+			print("ProceduralForestGenerator: WARNING - Could not get Terrain3DData")
 	else:
-		print("ProceduralForestGenerator: WARNING - Terrain3D node not found, path textures will not be applied")
+		print("ProceduralForestGenerator: WARNING - Terrain3D node not found")
 
 	# Set random seed
 	if random_seed == -1:
@@ -59,6 +66,10 @@ func _ready():
 	print("ProceduralForestGenerator: Generating paths...")
 	# Generate paths
 	_generate_paths()
+
+	print("ProceduralForestGenerator: Generating heightmap...")
+	# Generate terrain heightmap AFTER paths are marked
+	_generate_heightmap()
 
 	print("ProceduralForestGenerator: Applying path textures...")
 	# Apply path textures to terrain
@@ -145,6 +156,92 @@ func _mark_path_circle(center: Vector2, radius: float):
 			if dist <= radius and y < path_map.size() and x < path_map[y].size():
 				path_map[y][x] = true
 
+func _generate_heightmap():
+	# Create heightmap with hills and mountains, keeping paths flat
+	var grid_width = int(world_size.x)
+	var grid_height = int(world_size.y)
+
+	# Initialize height_map
+	height_map.resize(grid_height)
+	for y in grid_height:
+		height_map[y] = []
+		height_map[y].resize(grid_width)
+		for x in grid_width:
+			height_map[y][x] = 0.0
+
+	# Create noise generators for terrain
+	var terrain_noise_large = FastNoiseLite.new()
+	terrain_noise_large.seed = randi()
+	terrain_noise_large.frequency = 0.015  # Large hills/mountains
+	terrain_noise_large.noise_type = FastNoiseLite.TYPE_PERLIN
+
+	var terrain_noise_small = FastNoiseLite.new()
+	terrain_noise_small.seed = randi()
+	terrain_noise_small.frequency = 0.08  # Small bumps
+	terrain_noise_small.noise_type = FastNoiseLite.TYPE_PERLIN
+
+	# Generate base heightmap
+	for y in range(grid_height):
+		for x in range(grid_width):
+			# Combine large and small noise
+			var large_noise = terrain_noise_large.get_noise_2d(x, y)
+			var small_noise = terrain_noise_small.get_noise_2d(x, y)
+
+			# Large features (0-40m), small features (0-5m)
+			var height = large_noise * 40.0 + small_noise * 5.0
+
+			# Ensure non-negative heights
+			height = max(0.0, height)
+
+			# If this is a path, flatten it (low height)
+			if path_map[y][x]:
+				height = 2.0  # Paths at low, flat elevation
+
+			height_map[y][x] = height
+
+	# Smooth path edges to create gentle slopes
+	for y in range(grid_height):
+		for x in range(grid_width):
+			if path_map[y][x]:
+				# Smooth the area around paths
+				_smooth_height_around(x, y, 3)
+
+	# Apply heightmap to Terrain3D
+	if terrain_data:
+		print("ProceduralForestGenerator: Applying heightmap to Terrain3D...")
+		var heights_set = 0
+		for y in range(grid_height):
+			for x in range(grid_width):
+				var pos = Vector3(x, 0, y)
+				var height = height_map[y][x]
+				terrain_data.set_height(pos, height)
+				heights_set += 1
+
+		# Update terrain maps to apply changes
+		terrain_data.update_maps()
+		print("ProceduralForestGenerator: Set %d height values" % heights_set)
+	else:
+		print("ProceduralForestGenerator: WARNING - Cannot apply heightmap, terrain_data not available")
+
+func _smooth_height_around(center_x: int, center_y: int, radius: int):
+	# Smooth heights around a point to create gentle transitions
+	var grid_width = int(world_size.x)
+	var grid_height = int(world_size.y)
+
+	for dy in range(-radius, radius + 1):
+		for dx in range(-radius, radius + 1):
+			var nx = center_x + dx
+			var ny = center_y + dy
+
+			if nx >= 0 and nx < grid_width and ny >= 0 and ny < grid_height:
+				if not path_map[ny][nx]:
+					# Gradually increase height away from path
+					var dist = sqrt(dx * dx + dy * dy)
+					var blend = clamp(dist / radius, 0.0, 1.0)
+					var current_height = height_map[ny][nx]
+					var path_height = 2.0
+					height_map[ny][nx] = lerp(path_height, current_height, blend)
+
 func _generate_forest():
 	if maple_tree_scene == null or pine_tree_scene == null:
 		push_warning("Tree scenes not assigned to ProceduralForestGenerator!")
@@ -174,6 +271,14 @@ func _generate_forest():
 		if grid_z >= 0 and grid_z < path_map.size() and grid_x >= 0 and grid_x < path_map[grid_z].size():
 			if path_map[grid_z][grid_x]:
 				continue  # Skip if on path
+
+			# Check if on mountain (too high)
+			var terrain_height = height_map[grid_z][grid_x] if height_map.size() > grid_z and height_map[grid_z].size() > grid_x else 0.0
+			if terrain_height > 30.0:  # Don't spawn trees on mountains above 30m
+				continue
+
+			# Set tree Y position to terrain height
+			pos.y = terrain_height
 
 		# Check spacing from other trees
 		if _check_tree_spacing(pos):
@@ -210,14 +315,20 @@ func _apply_path_textures():
 	# This is simpler than programmatically painting Terrain3D textures
 
 	var path_material = StandardMaterial3D.new()
-	path_material.albedo_color = Color(0.7, 0.65, 0.5)  # Sandy gravel color
-	path_material.roughness = 0.9
+	path_material.albedo_color = Color(1.0, 0.95, 0.8)  # Very bright sandy/yellow color
+	path_material.roughness = 0.7
+	path_material.metallic = 0.0
+	path_material.cull_mode = BaseMaterial3D.CULL_DISABLED  # Visible from both sides
+	path_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED  # Always visible, no shadows
 
 	# Load sandy_gravel texture if available
 	var sandy_texture = load("res://demo/assets/textures/sandy_gravel_02_diff_1k.jpg")
 	if sandy_texture:
 		path_material.albedo_texture = sandy_texture
-		path_material.uv1_scale = Vector3(0.5, 0.5, 0.5)  # Scale texture for detail
+		path_material.uv1_scale = Vector3(0.3, 0.3, 0.3)  # Smaller scale for more detail
+		print("ProceduralForestGenerator: Sandy texture loaded successfully")
+	else:
+		print("ProceduralForestGenerator: WARNING - Sandy texture not found!")
 
 	var meshes_created = 0
 
@@ -225,16 +336,18 @@ func _apply_path_textures():
 	for y in range(path_map.size()):
 		for x in range(path_map[y].size()):
 			if path_map[y][x]:  # If this is a path
-				var world_pos = Vector3(x, 0.1, y)  # Slightly above ground
+				# Get height from our generated height_map
+				var terrain_height = height_map[y][x] if height_map.size() > y and height_map[y].size() > x else 0.0
 
-				# Create a small plane mesh at this location
+				var world_pos = Vector3(x, terrain_height + 0.05, y)  # Just slightly above terrain surface
+
+				# Create a flat box mesh for the path
 				var mesh_instance = MeshInstance3D.new()
-				var plane_mesh = PlaneMesh.new()
-				plane_mesh.size = Vector2(1.0, 1.0)  # 1x1 meter quad
-				mesh_instance.mesh = plane_mesh
+				var box_mesh = BoxMesh.new()
+				box_mesh.size = Vector3(1.2, 0.05, 1.2)  # Thin, flat box at terrain level
+				mesh_instance.mesh = box_mesh
 				mesh_instance.material_override = path_material
 				mesh_instance.position = world_pos
-				mesh_instance.rotation.x = 0  # Flat on ground
 
 				add_child(mesh_instance)
 				meshes_created += 1
