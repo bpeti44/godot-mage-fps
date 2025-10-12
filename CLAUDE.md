@@ -11,6 +11,23 @@ Example usage:
 - For system features: Search "godot physics" or "godot animation"
 - For plugins: Search "terrain3d godot" or relevant addon name
 
+**Godot MCP Tools**: Claude has access to specialized Godot MCP tools for project management. Use these tools when appropriate:
+
+- **mcp__godot__launch_editor**: Launch the Godot editor for this project (useful when scene structure changes need visual verification)
+- **mcp__godot__run_project**: Run the project and capture output (use this to test changes instead of asking the user to run manually)
+- **mcp__godot__get_debug_output**: Get current debug output and errors from a running project
+- **mcp__godot__stop_project**: Stop the currently running project
+- **mcp__godot__get_project_info**: Retrieve project metadata and configuration
+
+**When to use these tools:**
+- After implementing gameplay features that need testing (combat, movement, AI)
+- When debugging runtime errors or unexpected behavior
+- To verify scene structure changes are correct
+- When collision layers, signals, or node connections need validation
+- Instead of asking the user to manually test changes
+
+**Important**: Always run the project after significant changes to verify functionality before considering the task complete.
+
 ## Project Overview
 
 This is a 3D first-person/third-person action game built with Godot 4.5. The player controls a skeleton mage who can cast spells at zombies in a procedurally generated terrain environment.
