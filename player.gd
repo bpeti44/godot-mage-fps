@@ -19,6 +19,14 @@ var current_stamina: float = 100.0
 var can_sprint: bool = true  # Prevents sprint until stamina regenerates
 
 # -------------------------
+# MANA SYSTEM
+# -------------------------
+@export var max_mana: float = 100.0
+@export var mana_regen_rate: float = 10.0  # Mana per second when not casting
+@export var spell_mana_cost: float = 10.0  # Mana cost per spell cast
+var current_mana: float = 100.0
+
+# -------------------------
 # MOUSE / CAMERA SETTINGS
 # -------------------------
 @export var mouse_sensitivity: float = 0.1
@@ -79,6 +87,7 @@ var has_started_jump = false
 # NODE REFERENCES
 var meshes_to_hide: Array[MeshInstance3D] = []
 var stamina_bar: ProgressBar = null
+var mana_bar: ProgressBar = null
 
 # ORBIT MODE VARIABLES
 var orbiting = false
@@ -155,6 +164,12 @@ func _ready():
 		stamina_bar.max_value = max_stamina
 		stamina_bar.value = current_stamina
 
+	# Get mana bar reference
+	mana_bar = $CanvasLayer/StaminaBarContainer/VBoxContainer/ManaBar
+	if mana_bar:
+		mana_bar.max_value = max_mana
+		mana_bar.value = current_mana
+
 
 # -------------------------
 # INPUT HANDLING
@@ -177,7 +192,7 @@ func _unhandled_input(event):
 		return
 
 	# Casting input check
-	if event.is_action_pressed("fire_spell") and can_cast and not orbiting:
+	if event.is_action_pressed("fire_spell") and can_cast and not orbiting and current_mana >= spell_mana_cost:
 		_cast_spell()
 		get_viewport().set_input_as_handled()
 		return
@@ -271,11 +286,15 @@ func _play_animation(anim_name: String):
 func _cast_spell():
 	print("--- SPELL FUNCTION STARTED ---")
 
+	# Consume mana
+	current_mana -= spell_mana_cost
+	current_mana = max(0.0, current_mana)
+
 	is_casting = true
 	can_cast = false
 	_play_animation("Spellcasting")
 	cast_animation_timer.start(spell_cast_time)
-	
+
 	casting_timer.start(cast_cooldown)
 
 	var mouse_pos = get_viewport().get_mouse_position()
@@ -375,6 +394,15 @@ func _physics_process(delta):
 		# Update stamina bar UI
 		if stamina_bar:
 			stamina_bar.value = current_stamina
+
+		# Mana regeneration (continuous, always regenerates when not casting)
+		if not is_casting:
+			current_mana += mana_regen_rate * delta
+			current_mana = min(max_mana, current_mana)
+
+		# Update mana bar UI
+		if mana_bar:
+			mana_bar.value = current_mana
 
 		var current_speed = speed * (sprint_multiplier if is_sprinting else 1.0)
 
