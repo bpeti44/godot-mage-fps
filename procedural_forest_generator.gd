@@ -27,9 +27,10 @@ extends Node3D
 
 # Path generation settings
 @export var path_segments: int = 50
-@export var path_curve_strength: float = 20.0
+@export var path_curve_strength: float = 35.0  # Increased for more curves
 @export var branch_probability: float = 0.15
-@export var max_branches: int = 3
+@export var min_branches: int = 3  # Minimum guaranteed branches
+@export var max_branches: int = 6  # Maximum total branches
 @export var max_path_slope_degrees: float = 15.0  # Maximum walkable slope in degrees
 @export var path_smoothing_radius: float = 6.0  # Radius for terrain smoothing around paths
 
@@ -40,6 +41,7 @@ var height_map: Array = []  # 2D grid storing terrain heights
 var tree_instances: Array = []
 var terrain: Terrain3D = null  # Reference to Terrain3D node
 var terrain_data = null  # Reference to Terrain3DData
+var main_road_start: Vector2 = Vector2.ZERO  # Starting point of main road in grid space
 
 func _ready():
 	print("ProceduralForestGenerator: Starting initialization...")
@@ -97,6 +99,21 @@ func _ready():
 	# Generate bushes and rocks
 	_generate_foliage()
 
+	# Position player at main road start (after heightmap is ready)
+	var player = get_node_or_null("../Player")
+	if player and terrain_data:
+		var road_start_world = Vector3(
+			main_road_start.x + world_offset.x,
+			0,
+			main_road_start.y + world_offset.y
+		)
+		# Get actual terrain height at road start
+		road_start_world.y = terrain_data.get_height(road_start_world)
+
+		# Place player at road start, elevated for spawn drop
+		player.global_position = road_start_world + Vector3(0, 10, 0)
+		print("ProceduralForestGenerator: Placed player at main road start (%f, %f, %f)" % [player.global_position.x, player.global_position.y, player.global_position.z])
+
 	print("ProceduralForestGenerator: Initialization complete!")
 
 func _initialize_path_map():
@@ -112,6 +129,10 @@ func _initialize_path_map():
 			path_map[y][x] = false
 
 func _generate_paths():
+	# Generate connected road network:
+	# 1. Main road crosses entire map (player spawn to edge)
+	# 2. Branch roads connect to main road (not isolated)
+
 	# Find player position (assuming player spawns at world origin)
 	var player_spawn = Vector2(world_size.x * 0.5, world_size.y * 0.5)  # Center of world in grid space
 
@@ -129,30 +150,79 @@ func _generate_paths():
 	player_spawn.x = clamp(player_spawn.x, 0, world_size.x - 1)
 	player_spawn.y = clamp(player_spawn.y, 0, world_size.y - 1)
 
-	# Generate main path starting from player position
-	var main_path_end = Vector2(
-		randf_range(world_size.x * 0.7, world_size.x * 0.9),
-		randf_range(world_size.y * 0.3, world_size.y * 0.7)
-	)
-	_generate_single_path(player_spawn, main_path_end, path_segments)
-	print("ProceduralForestGenerator: Main path from player (%f, %f) to (%f, %f)" % [player_spawn.x, player_spawn.y, main_path_end.x, main_path_end.y])
+	# Generate MAIN road: crosses entire map from one edge to opposite edge
+	# Road is independent of player spawn, player will be placed near road start
+	# Randomly choose axis: 0=horizontal (left-right), 1=vertical (top-bottom)
+	var road_axis = randi() % 2
+	var main_path_start: Vector2
+	var main_path_end: Vector2
 
-	# Generate branch paths
+	# Add variation to endpoints so the road curves instead of being straight
+	var center = world_size * 0.5
+	var endpoint_variation = world_size.x * 0.45  # 45% of map width for more dramatic curves
+
+	if road_axis == 0:  # Horizontal: left to right
+		main_path_start = Vector2(
+			0,
+			randf_range(center.y - endpoint_variation, center.y + endpoint_variation)
+		)
+		main_path_end = Vector2(
+			world_size.x - 1,
+			randf_range(center.y - endpoint_variation, center.y + endpoint_variation)
+		)
+		# Clamp to world bounds
+		main_path_start.y = clamp(main_path_start.y, 10, world_size.y - 10)
+		main_path_end.y = clamp(main_path_end.y, 10, world_size.y - 10)
+	else:  # Vertical: top to bottom
+		main_path_start = Vector2(
+			randf_range(center.x - endpoint_variation, center.x + endpoint_variation),
+			0
+		)
+		main_path_end = Vector2(
+			randf_range(center.x - endpoint_variation, center.x + endpoint_variation),
+			world_size.y - 1
+		)
+		# Clamp to world bounds
+		main_path_start.x = clamp(main_path_start.x, 10, world_size.x - 10)
+		main_path_end.x = clamp(main_path_end.x, 10, world_size.x - 10)
+
+	# Store main road start for player positioning later
+	main_road_start = main_path_start
+
+	# Generate and store main path points for branch connection
+	var main_path_points = _generate_single_path(main_path_start, main_path_end, path_segments * 2)
+	print("ProceduralForestGenerator: Main road crosses map from (%f, %f) to (%f, %f)" % [main_path_start.x, main_path_start.y, main_path_end.x, main_path_end.y])
+
+	# Generate branch paths that connect to main road
+	# First, ensure minimum branches are created
 	var branches_created = 0
-	for i in range(path_segments):
-		if randf() < branch_probability and branches_created < max_branches:
-			var branch_start = Vector2(
-				randf_range(world_size.x * 0.2, world_size.x * 0.8),
-				randf_range(world_size.y * 0.2, world_size.y * 0.8)
-			)
-			var branch_end = branch_start + Vector2(
-				randf_range(-100, 100),
-				randf_range(-100, 100)
-			)
-			_generate_single_path(branch_start, branch_end, int(path_segments / 2))
-			branches_created += 1
+	var target_branches = randi_range(min_branches, max_branches)
 
-func _generate_single_path(start: Vector2, end: Vector2, segments: int):
+	# Create guaranteed minimum branches
+	for i in range(target_branches):
+		# Distribute branches evenly along main road for guaranteed minimum
+		var segment_size = float(main_path_points.size()) / float(target_branches)
+		var base_index = int(float(i) * segment_size + randf_range(0, segment_size * 0.5))
+		base_index = clamp(base_index, 0, main_path_points.size() - 1)
+
+		var branch_start = main_path_points[base_index]
+
+		# Branch end is somewhere off to the side
+		var perpendicular = (main_path_end - main_path_start).orthogonal().normalized()
+		var branch_direction = perpendicular if randf() > 0.5 else -perpendicular
+		var branch_length = randf_range(30, 80)
+
+		var branch_end = branch_start + branch_direction * branch_length
+
+		# Clamp to world bounds
+		branch_end.x = clamp(branch_end.x, 0, world_size.x - 1)
+		branch_end.y = clamp(branch_end.y, 0, world_size.y - 1)
+
+		_generate_single_path(branch_start, branch_end, int(path_segments / 3))
+		branches_created += 1
+		print("ProceduralForestGenerator: Branch road %d from main road point %d" % [branches_created, base_index])
+
+func _generate_single_path(start: Vector2, end: Vector2, segments: int) -> Array:
 	var points: Array = []
 
 	# Generate path points with noise-based curves
@@ -170,6 +240,8 @@ func _generate_single_path(start: Vector2, end: Vector2, segments: int):
 	# Mark path on grid
 	for i in range(points.size() - 1):
 		_mark_path_segment(points[i], points[i + 1])
+
+	return points
 
 func _mark_path_segment(from: Vector2, to: Vector2):
 	# Draw a thick line on the path map
