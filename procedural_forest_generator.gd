@@ -30,6 +30,8 @@ extends Node3D
 @export var path_curve_strength: float = 20.0
 @export var branch_probability: float = 0.15
 @export var max_branches: int = 3
+@export var max_path_slope_degrees: float = 15.0  # Maximum walkable slope in degrees
+@export var path_smoothing_radius: float = 6.0  # Radius for terrain smoothing around paths
 
 # Internal variables
 var noise: FastNoiseLite
@@ -231,7 +233,8 @@ func _generate_heightmap():
 
 			height_map[y][x] = height
 
-	# No path flattening or smoothing - paths follow natural terrain contours
+	# Smooth paths to make them walkable and visually coherent
+	_smooth_paths_for_walkability()
 
 	# Apply heightmap to Terrain3D
 	if terrain_data:
@@ -256,6 +259,102 @@ func _generate_heightmap():
 	else:
 		print("ProceduralForestGenerator: WARNING - Cannot apply heightmap, terrain_data not available")
 
+
+func _smooth_paths_for_walkability():
+	# Smooth terrain along paths to ensure walkability and visual coherence
+	# Strategy:
+	# 1. Within path width, terrain is flat (same height across width)
+	# 2. Outside path, smooth transition to natural terrain
+	# 3. Along path length, gentle slopes respecting max_path_slope_degrees
+
+	var grid_width = int(world_size.x)
+	var grid_height = int(world_size.y)
+	var max_slope_radians = deg_to_rad(max_path_slope_degrees)
+	var path_half_width = path_width * 0.5
+	var smoothing_radius = int(path_smoothing_radius)
+
+	# Create a copy of the heightmap for reading while we modify
+	var original_heights: Array = []
+	original_heights.resize(grid_height)
+	for y in range(grid_height):
+		original_heights[y] = height_map[y].duplicate()
+
+	# First pass: Flatten path pixels to have consistent height across width
+	# We'll use the average height of each path segment
+	for y in range(grid_height):
+		for x in range(grid_width):
+			if path_map[y][x]:
+				# Calculate average height in a small radius (just the path itself)
+				var sum_height = 0.0
+				var count = 0
+				var check_radius = int(path_half_width)
+
+				for dy in range(-check_radius, check_radius + 1):
+					for dx in range(-check_radius, check_radius + 1):
+						var nx = x + dx
+						var ny = y + dy
+						if nx >= 0 and nx < grid_width and ny >= 0 and ny < grid_height:
+							if path_map[ny][nx]:
+								sum_height += original_heights[ny][nx]
+								count += 1
+
+				if count > 0:
+					var avg_height = sum_height / count
+					# Set all path pixels in width to same height
+					for dy in range(-check_radius, check_radius + 1):
+						for dx in range(-check_radius, check_radius + 1):
+							var nx = x + dx
+							var ny = y + dy
+							if nx >= 0 and nx < grid_width and ny >= 0 and ny < grid_height:
+								var dist_from_center = sqrt(dx * dx + dy * dy)
+								if dist_from_center <= path_half_width and path_map[ny][nx]:
+									height_map[ny][nx] = avg_height
+
+	# Second pass: Smooth edges outside path for natural transitions
+	var pixels_smoothed = 0
+	for y in range(grid_height):
+		for x in range(grid_width):
+			if not path_map[y][x]:  # If NOT on path
+				# Check if we're near a path
+				var nearest_path_height = -1.0
+				var nearest_path_dist = 999999.0
+
+				for dy in range(-smoothing_radius, smoothing_radius + 1):
+					for dx in range(-smoothing_radius, smoothing_radius + 1):
+						var nx = x + dx
+						var ny = y + dy
+
+						if nx >= 0 and nx < grid_width and ny >= 0 and ny < grid_height:
+							if path_map[ny][nx]:
+								var dist = sqrt(dx * dx + dy * dy)
+								if dist < nearest_path_dist:
+									nearest_path_dist = dist
+									nearest_path_height = height_map[ny][nx]
+
+				# If near a path, blend height
+				if nearest_path_height >= 0.0 and nearest_path_dist <= smoothing_radius:
+					var blend = 1.0 - (nearest_path_dist / smoothing_radius)
+					blend = blend * blend  # Smooth falloff
+
+					var original_height = original_heights[y][x]
+					var target_height = lerp(original_height, nearest_path_height, blend)
+
+					# Respect max slope
+					var horizontal_dist = max(nearest_path_dist, 0.1)
+					var height_diff = abs(target_height - nearest_path_height)
+					var slope_angle = atan(height_diff / horizontal_dist)
+
+					if slope_angle > max_slope_radians:
+						var max_height_diff = horizontal_dist * tan(max_slope_radians)
+						if target_height > nearest_path_height:
+							target_height = nearest_path_height + max_height_diff
+						else:
+							target_height = nearest_path_height - max_height_diff
+
+					height_map[y][x] = target_height
+					pixels_smoothed += 1
+
+	print("ProceduralForestGenerator: Smoothed %d pixels for walkable paths" % pixels_smoothed)
 
 func _generate_forest():
 	if maple_tree_scene == null or pine_tree_scene == null:
