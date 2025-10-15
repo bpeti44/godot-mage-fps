@@ -15,8 +15,8 @@ extends Node3D
 @export var random_seed: int = -1  # -1 = use random seed each run
 
 # Tree scene references
-@export var maple_tree_scene: PackedScene
-@export var pine_tree_scene: PackedScene
+@export var maple_tree: PackedScene
+@export var pine_tree: PackedScene
 @export var tree_mix_ratio: float = 0.5  # 0.0 = all pine, 1.0 = all maple
 
 # Foliage scene references
@@ -429,7 +429,7 @@ func _smooth_paths_for_walkability():
 	print("ProceduralForestGenerator: Smoothed %d pixels for walkable paths" % pixels_smoothed)
 
 func _generate_forest():
-	if maple_tree_scene == null or pine_tree_scene == null:
+	if maple_tree == null or pine_tree == null:
 		push_warning("Tree scenes not assigned to ProceduralForestGenerator!")
 		return
 
@@ -480,7 +480,7 @@ func _check_tree_spacing(pos: Vector3) -> bool:
 
 func _spawn_tree(pos: Vector3):
 	# Choose tree type based on mix ratio
-	var tree_scene = pine_tree_scene if randf() > tree_mix_ratio else maple_tree_scene
+	var tree_scene = pine_tree if randf() > tree_mix_ratio else maple_tree
 
 	var tree = tree_scene.instantiate()
 	tree.position = pos
