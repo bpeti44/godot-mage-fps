@@ -19,8 +19,14 @@ func _ready():
 		print("FATAL ERROR: Player node not found or not in 'player' group.")
 		return # Stop the script if player is not found
 
-	# Spawn a zombie when the game starts
-	spawn_zombie(Vector3(22, 0.5, 0))
+	# Wait for player to be positioned by terrain generator
+	await get_tree().create_timer(0.5).timeout
+
+	# Spawn a zombie close to player for testing (10 meters in front)
+	var spawn_offset = player_target.transform.basis.z * -10.0  # 10m forward
+	var zombie_spawn_pos = player_target.global_position + spawn_offset
+	zombie_spawn_pos.y = player_target.global_position.y  # Same height as player
+	spawn_zombie(zombie_spawn_pos)
 
 
 func spawn_zombie(spawn_position: Vector3):
