@@ -15,3 +15,7 @@ Thumbs.db
 
 # User specific data
 *.user
+
+# Temporary files
+*.TMP
+*~
