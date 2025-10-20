@@ -1,8 +1,9 @@
-[gd_scene load_steps=7 format=3 uid="uid://bqwryg05t6yu2"]
+[gd_scene load_steps=8 format=3 uid="uid://bqwryg05t6yu2"]
 
 [ext_resource type="Script" uid="uid://dut78uyna084m" path="res://player.gd" id="1_i3pqv"]
 [ext_resource type="PackedScene" uid="uid://cpyyyo7cr8af7" path="res://skeleton_mage.tscn" id="2_hqtel"]
 [ext_resource type="Texture2D" uid="uid://bg4p70y8syp6e" path="res://demo/assets/textures/Hitmarker-PNG-File.png" id="3_sweqy"]
+[ext_resource type="PackedScene" uid="uid://c5y8qxr2jvw7h" path="res://minimap.tscn" id="4_minimap"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_n766f"]
 
@@ -75,3 +76,5 @@ layout_mode = 2
 theme_override_styles/fill = SubResource("StyleBoxFlat_stamina")
 value = 100.0
 show_percentage = false
+
+[node name="Minimap" parent="CanvasLayer" instance=ExtResource("4_minimap")]
