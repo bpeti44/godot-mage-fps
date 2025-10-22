@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="Item" load_steps=3 format=3 uid="uid://bn30unjwifvjr"]
+
+[ext_resource type="Script" uid="uid://c52rkv4dmrylq" path="res://item.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://cw074mdcllsf" path="res://items/icons/wood.png" id="1_xw7br"]
+
+[resource]
+script = ExtResource("1")
+item_name = "Fa"
+description = "Egy darab fa. Építéshez és craftoláshoz használható."
+icon = ExtResource("1_xw7br")

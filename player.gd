@@ -175,16 +175,22 @@ func _ready():
 # INPUT HANDLING
 # -------------------------
 func _unhandled_input(event):
-	
+
+	# Test inventory - Press T to add test items
+	if event is InputEventKey and event.pressed and event.keycode == KEY_T:
+		_test_add_items()
+		get_viewport().set_input_as_handled()
+		return
+
 	# Toggle View (FP / TP)
 	if event.is_action_pressed("toggle_view"):
 		is_first_person = not is_first_person
-		
+
 		# Hide/show meshes: Show in TP mode, hide in FP mode
 		for mesh in meshes_to_hide:
 			if mesh:
 				mesh.visible = not is_first_person
-			
+
 		# Disable orbit mode when switching to FPS
 		if is_first_person:
 			orbiting = false
@@ -197,6 +203,10 @@ func _unhandled_input(event):
 		get_viewport().set_input_as_handled()
 		return
 	
+	# Skip camera controls if inventory is open
+	if Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
+		return
+
 	# Existing Orbit and Mouse Movement Input
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_MIDDLE:
@@ -207,13 +217,13 @@ func _unhandled_input(event):
 			else:
 				rotation.y = orbit_yaw
 				rotation_x = orbit_pitch
-				
+
 				# Restore the base tilt (TP) or vertical rotation (FP) after orbit is disabled
 				if not is_first_person:
 					camera.rotation_degrees.x = rotation_x + TP_BASE_ROTATION_X
 				else:
 					camera.rotation_degrees.x = rotation_x
-				
+
 
 	if event is InputEventMouseMotion:
 		if orbiting:
@@ -517,3 +527,21 @@ func _physics_process(delta):
 				_play_animation("Walking_A")
 		else:
 			_play_animation("Idle")
+
+# -------------------------
+# INVENTORY HELPERS (for testing)
+# -------------------------
+func _test_add_items():
+	var inventory_manager = get_node_or_null("InventoryManager")
+	if inventory_manager:
+		# Load example items
+		var stone = load("res://items/stone.tres")
+		var wood = load("res://items/wood.tres")
+
+		if stone:
+			inventory_manager.add_item(stone, 5)
+			print("Added 5 stones to inventory")
+
+		if wood:
+			inventory_manager.add_item(wood, 3)
+			print("Added 3 wood to inventory")

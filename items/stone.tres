@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="Item" load_steps=3 format=3 uid="uid://d4jahul0vltsa"]
+
+[ext_resource type="Script" uid="uid://c52rkv4dmrylq" path="res://item.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://0u6itjo80mh6" path="res://items/icons/stone.png" id="1_mwerj"]
+
+[resource]
+script = ExtResource("1")
+item_name = "Kő"
+description = "Egy darab kemény kő. Építéshez használható."
+icon = ExtResource("1_mwerj")
