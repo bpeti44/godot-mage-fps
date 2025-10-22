@@ -637,7 +637,7 @@ func _spawn_foliage_type(scene: PackedScene, density: float, type_name: String, 
 
 	print("ProceduralForestGenerator: Placed %d %s out of %d target" % [placed, type_name, target_count])
 
-func _spawn_test_pickupables(spawn_center: Vector3):
+func _spawn_test_pickupables(_spawn_center: Vector3):
 	# Load pickupable scenes
 	var pickupable_rock = load("res://pickupable_rock.tscn")
 	var pickupable_pine = load("res://pickupable_pine_tree.tscn")
@@ -647,39 +647,87 @@ func _spawn_test_pickupables(spawn_center: Vector3):
 		print("ProceduralForestGenerator: WARNING - Could not load pickupable scenes")
 		return
 
-	# Spawn rocks around the player (closer, easier to find)
-	var rock_positions = [
-		Vector3(5, 0, 3),    # Front-right
-		Vector3(-4, 0, 4),   # Front-left
-		Vector3(3, 0, -2),   # Back-right
-	]
+	# Configuration for random spawning
+	var num_rocks = 80  # Number of rocks to spawn
+	var num_tree_branches = 40  # Number of tree branches to spawn (both types)
+	var search_radius = 12.0  # How close to paths we should spawn items
+	var max_attempts = 500  # Maximum attempts to find valid spawn positions
 
-	for offset in rock_positions:
-		var rock = pickupable_rock.instantiate()
-		var pos = spawn_center + offset
-		pos.y = terrain_data.get_height(pos) + 0.5  # Slightly above ground
-		rock.position = pos  # Use position instead of global_position before adding to tree
-		rock.scale = Vector3(2, 2, 2)  # Make them bigger and easier to see
-		get_parent().call_deferred("add_child", rock)
+	var grid_width = int(world_size.x)
+	var grid_height = int(world_size.y)
 
-	# Spawn a couple of trees
-	var tree_positions = [
-		Vector3(7, 0, 0),    # Right side
-		Vector3(-6, 0, 2),   # Left side
-	]
+	var spawned_rocks = 0
+	var spawned_trees = 0
 
-	var tree = pickupable_pine.instantiate()
-	var tree_pos = spawn_center + tree_positions[0]
-	tree_pos.y = terrain_data.get_height(tree_pos)
-	tree.position = tree_pos  # Use position instead of global_position
-	tree.scale = Vector3(0.3, 0.3, 0.3)
-	get_parent().call_deferred("add_child", tree)
+	# Helper function to check if position is near a path
+	var is_near_path = func(grid_pos: Vector2) -> bool:
+		var gx = int(grid_pos.x)
+		var gz = int(grid_pos.y)
 
-	var maple = pickupable_maple.instantiate()
-	var maple_pos = spawn_center + tree_positions[1]
-	maple_pos.y = terrain_data.get_height(maple_pos)
-	maple.position = maple_pos  # Use position instead of global_position
-	maple.scale = Vector3(0.3, 0.3, 0.3)
-	get_parent().call_deferred("add_child", maple)
+		# Check nearby cells for paths
+		for dy in range(-int(search_radius), int(search_radius) + 1):
+			for dx in range(-int(search_radius), int(search_radius) + 1):
+				var nx = gx + dx
+				var nz = gz + dy
+				if nz >= 0 and nz < path_map.size() and nx >= 0 and nx < path_map[nz].size():
+					if path_map[nz][nx]:
+						var dist = Vector2(dx, dy).length()
+						if dist <= search_radius:
+							return true
+		return false
 
-	print("ProceduralForestGenerator: Spawned test pickupable objects near player")
+	# Spawn rocks
+	for i in range(max_attempts):
+		if spawned_rocks >= num_rocks:
+			break
+
+		# Random position in grid space
+		var rand_grid_x = randf_range(0, grid_width)
+		var rand_grid_z = randf_range(0, grid_height)
+		var grid_pos = Vector2(rand_grid_x, rand_grid_z)
+
+		# Check if near a path
+		if is_near_path.call(grid_pos):
+			# Convert to world space
+			var world_x = world_offset.x + rand_grid_x
+			var world_z = world_offset.y + rand_grid_z
+			var pos = Vector3(world_x, 0, world_z)
+
+			if terrain_data:
+				pos.y = terrain_data.get_height(pos)
+
+			var rock = pickupable_rock.instantiate()
+			rock.position = pos
+			# Scale is now set in the scene file (pickupable_rock.tscn)
+			get_parent().call_deferred("add_child", rock)
+			spawned_rocks += 1
+
+	# Spawn tree branches (mix of pine and maple)
+	for i in range(max_attempts):
+		if spawned_trees >= num_tree_branches:
+			break
+
+		# Random position in grid space
+		var rand_grid_x = randf_range(0, grid_width)
+		var rand_grid_z = randf_range(0, grid_height)
+		var grid_pos = Vector2(rand_grid_x, rand_grid_z)
+
+		# Check if near a path
+		if is_near_path.call(grid_pos):
+			# Convert to world space
+			var world_x = world_offset.x + rand_grid_x
+			var world_z = world_offset.y + rand_grid_z
+			var pos = Vector3(world_x, 0, world_z)
+
+			if terrain_data:
+				pos.y = terrain_data.get_height(pos) - 0.1  # Lower to sit on ground
+
+			# Randomly choose between pine and maple
+			var tree_scene = pickupable_pine if randf() < 0.5 else pickupable_maple
+			var tree = tree_scene.instantiate()
+			tree.position = pos
+			tree.scale = Vector3(0.1, 0.1, 0.1)
+			get_parent().call_deferred("add_child", tree)
+			spawned_trees += 1
+
+	print("ProceduralForestGenerator: Spawned %d rocks and %d tree branches near paths" % [spawned_rocks, spawned_trees])
