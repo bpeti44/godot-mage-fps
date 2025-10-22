@@ -1,11 +1,11 @@
 [gd_scene load_steps=5 format=3 uid="uid://dcx8p7qmf3y5o"]
 
-[ext_resource type="PackedScene" uid="uid://ln5bisoeqix" path="res://demo/assets/models/pine_tree.glb" id="1_pine_model"]
+[ext_resource type="PackedScene" uid="uid://bvaepwt6063mg" path="res://assets/models/tree_branch.glb" id="1_tree_branch_model"]
 [ext_resource type="Script" path="res://pickupable.gd" id="2_pickupable"]
 [ext_resource type="Resource" uid="uid://bn30unjwifvjr" path="res://items/wood.tres" id="3_wood_item"]
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_r57si"]
-size = Vector3(15, 555, 15)
+[sub_resource type="BoxShape3D" id="BoxShape3D_branch"]
+size = Vector3(10, 5, 10)
 
 [node name="PickupablePineTree" type="Node3D"]
 script = ExtResource("2_pickupable")
@@ -13,11 +13,10 @@ item = ExtResource("3_wood_item")
 quantity = 1
 display_name = ""
 
-[node name="Sketchfab_Scene" parent="." instance=ExtResource("1_pine_model")]
+[node name="tree_branch_scene" parent="." instance=ExtResource("1_tree_branch_model")]
 
-[node name="StaticBody3D" type="StaticBody3D" parent="Sketchfab_Scene/Sketchfab_model/Pine_fbx/RootNode" index="0"]
+[node name="StaticBody3D" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Sketchfab_Scene/Sketchfab_model/Pine_fbx/RootNode/StaticBody3D" index="0"]
-shape = SubResource("BoxShape3D_r57si")
-
-[editable path="Sketchfab_Scene"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D"]
+shape = SubResource("BoxShape3D_branch")

@@ -1,11 +1,11 @@
 [gd_scene load_steps=5 format=3 uid="uid://b2yaq8rmg406p"]
 
-[ext_resource type="PackedScene" uid="uid://bjmj8jn7qy201" path="res://demo/assets/models/maple_tree.glb" id="1_maple_model"]
+[ext_resource type="PackedScene" uid="uid://bvaepwt6063mg" path="res://assets/models/tree_branch.glb" id="1_tree_branch_model"]
 [ext_resource type="Script" path="res://pickupable.gd" id="2_pickupable"]
 [ext_resource type="Resource" uid="uid://bn30unjwifvjr" path="res://items/wood.tres" id="3_wood_item"]
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_nyvgf"]
-size = Vector3(15, 555, 15)
+[sub_resource type="BoxShape3D" id="BoxShape3D_branch"]
+size = Vector3(10, 5, 10)
 
 [node name="PickupableMapleTree" type="Node3D"]
 script = ExtResource("2_pickupable")
@@ -13,11 +13,10 @@ item = ExtResource("3_wood_item")
 quantity = 1
 display_name = ""
 
-[node name="maple_tree_scene" parent="." instance=ExtResource("1_maple_model")]
+[node name="tree_branch_scene" parent="." instance=ExtResource("1_tree_branch_model")]
 
-[node name="StaticBody3D" type="StaticBody3D" parent="maple_tree_scene/Sketchfab_model/Maple_fbx/RootNode" index="0"]
+[node name="StaticBody3D" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="maple_tree_scene/Sketchfab_model/Maple_fbx/RootNode/StaticBody3D" index="0"]
-shape = SubResource("BoxShape3D_nyvgf")
-
-[editable path="maple_tree_scene"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D"]
+shape = SubResource("BoxShape3D_branch")
