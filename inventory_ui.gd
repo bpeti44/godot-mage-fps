@@ -23,11 +23,20 @@ func _ready():
 		var slot_ui = create_slot_ui()
 		grid_container.add_child(slot_ui)
 
+	# Get inventory manager - look for it in the player node
+	if not inventory_manager:
+		# We're in Player/CanvasLayer/InventoryUI
+		# Manager is at Player/InventoryManager
+		var player = get_parent().get_parent()  # Go up to Player
+		if player:
+			inventory_manager = player.get_node_or_null("InventoryManager")
+
 	# Connect to inventory manager if available
 	if inventory_manager:
 		inventory_manager.inventory_changed.connect(_on_inventory_changed)
 
-	update_all_slots()
+	# Don't update slots here - wait until inventory is opened
+	# update_all_slots()
 
 func _input(event):
 	# Toggle inventory with I key
@@ -82,11 +91,16 @@ func update_all_slots():
 	if not inventory_manager:
 		return
 
+	# Check if manager is ready (slots initialized)
+	if inventory_manager.slots.size() == 0:
+		return
+
 	var slot_uis = grid_container.get_children()
 	for i in range(min(slot_uis.size(), 9)):
 		var slot_ui = slot_uis[i]
+		var slot_data = inventory_manager.get_slot(i)
 		if slot_ui.has_method("set_slot"):
-			slot_ui.set_slot(inventory_manager.get_slot(i), i)
+			slot_ui.set_slot(slot_data, i)
 
 func _on_inventory_changed():
 	if visible:
