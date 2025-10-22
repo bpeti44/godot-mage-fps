@@ -48,6 +48,11 @@ func create_slot_ui():
 	var slot_ui = Panel.new()
 	slot_ui.custom_minimum_size = Vector2(64, 64)
 
+	# Add a dark background so items are visible
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.2, 0.2, 0.2, 1)  # Dark gray background
+	slot_ui.add_theme_stylebox_override("panel", style)
+
 	var margin = MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 4)
 	margin.add_theme_constant_override("margin_right", 4)
@@ -80,32 +85,26 @@ func create_slot_ui():
 
 func toggle_inventory():
 	visible = !visible
-	print("InventoryUI: Toggle inventory, visible=", visible)
 
 	# Pause/unpause the game when inventory is open
 	if visible:
 		get_tree().paused = true
-		print("InventoryUI: Calling update_all_slots")
 		update_all_slots()
 	else:
 		get_tree().paused = false
 
 func update_all_slots():
 	if not inventory_manager:
-		print("InventoryUI: No manager")
 		return
 
 	# Check if manager is ready (slots initialized)
 	if inventory_manager.slots.size() == 0:
-		print("InventoryUI: Manager has no slots yet")
 		return
 
 	var slot_uis = grid_container.get_children()
-	print("InventoryUI: Updating ", slot_uis.size(), " slot UIs")
 	for i in range(min(slot_uis.size(), 9)):
 		var slot_ui = slot_uis[i]
 		var slot_data = inventory_manager.get_slot(i)
-		print("  Slot ", i, ": ", slot_data, " empty=", slot_data.is_empty() if slot_data else "null")
 
 		# Get the UI elements from meta
 		var icon_rect = slot_ui.get_meta("icon_rect")
@@ -116,7 +115,6 @@ func update_all_slots():
 			icon_rect.texture = null
 			quantity_label.text = ""
 			slot_ui.modulate = Color(1, 1, 1, 0.5)  # Dimmed when empty
-			print("    -> Set as empty")
 		else:
 			icon_rect.texture = slot_data.item.icon
 			if slot_data.item.is_stackable and slot_data.quantity > 1:
@@ -124,7 +122,6 @@ func update_all_slots():
 			else:
 				quantity_label.text = ""
 			slot_ui.modulate = Color(1, 1, 1, 1)  # Full opacity when filled
-			print("    -> Set item: ", slot_data.item.item_name, " icon=", icon_rect.texture, " qty=", quantity_label.text)
 
 func _on_inventory_changed():
 	if visible:
