@@ -27,20 +27,25 @@ func _initialize_nodes():
 
 ## Update the visual display of this slot
 func update_display():
+	print("SlotUI update_display: icon_rect=", icon_rect, " quantity_label=", quantity_label)
 	if icon_rect == null or quantity_label == null:
+		print("  -> Nodes are null, skipping")
 		return
 
 	if slot_data == null or slot_data.is_empty():
+		print("  -> Empty slot")
 		icon_rect.texture = null
 		quantity_label.text = ""
 		modulate = Color(1, 1, 1, 0.5)  # Dimmed when empty
 	else:
+		print("  -> Setting item: ", slot_data.item.item_name, " icon=", slot_data.item.icon, " qty=", slot_data.quantity)
 		icon_rect.texture = slot_data.item.icon
 		if slot_data.item.is_stackable and slot_data.quantity > 1:
 			quantity_label.text = str(slot_data.quantity)
 		else:
 			quantity_label.text = ""
 		modulate = Color(1, 1, 1, 1)  # Full opacity when filled
+		print("  -> Done. icon_rect.texture=", icon_rect.texture, " label.text=", quantity_label.text)
 
 ## Set the slot data and update display
 func set_slot(p_slot_data, index: int):
