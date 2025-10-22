@@ -114,6 +114,9 @@ func _ready():
 		player.global_position = road_start_world + Vector3(0, 10, 0)
 		print("ProceduralForestGenerator: Placed player at main road start (%f, %f, %f)" % [player.global_position.x, player.global_position.y, player.global_position.z])
 
+		# Spawn test pickupable objects near player
+		_spawn_test_pickupables(road_start_world)
+
 	print("ProceduralForestGenerator: Initialization complete!")
 
 func _initialize_path_map():
@@ -633,3 +636,50 @@ func _spawn_foliage_type(scene: PackedScene, density: float, type_name: String, 
 			placed += 1
 
 	print("ProceduralForestGenerator: Placed %d %s out of %d target" % [placed, type_name, target_count])
+
+func _spawn_test_pickupables(spawn_center: Vector3):
+	# Load pickupable scenes
+	var pickupable_rock = load("res://pickupable_rock.tscn")
+	var pickupable_pine = load("res://pickupable_pine_tree.tscn")
+	var pickupable_maple = load("res://pickupable_maple_tree.tscn")
+
+	if not pickupable_rock or not pickupable_pine or not pickupable_maple:
+		print("ProceduralForestGenerator: WARNING - Could not load pickupable scenes")
+		return
+
+	# Spawn rocks around the player (closer, easier to find)
+	var rock_positions = [
+		Vector3(5, 0, 3),    # Front-right
+		Vector3(-4, 0, 4),   # Front-left
+		Vector3(3, 0, -2),   # Back-right
+	]
+
+	for offset in rock_positions:
+		var rock = pickupable_rock.instantiate()
+		var pos = spawn_center + offset
+		pos.y = terrain_data.get_height(pos) + 0.5  # Slightly above ground
+		rock.position = pos  # Use position instead of global_position before adding to tree
+		rock.scale = Vector3(2, 2, 2)  # Make them bigger and easier to see
+		get_parent().call_deferred("add_child", rock)
+
+	# Spawn a couple of trees
+	var tree_positions = [
+		Vector3(7, 0, 0),    # Right side
+		Vector3(-6, 0, 2),   # Left side
+	]
+
+	var tree = pickupable_pine.instantiate()
+	var tree_pos = spawn_center + tree_positions[0]
+	tree_pos.y = terrain_data.get_height(tree_pos)
+	tree.position = tree_pos  # Use position instead of global_position
+	tree.scale = Vector3(0.3, 0.3, 0.3)
+	get_parent().call_deferred("add_child", tree)
+
+	var maple = pickupable_maple.instantiate()
+	var maple_pos = spawn_center + tree_positions[1]
+	maple_pos.y = terrain_data.get_height(maple_pos)
+	maple.position = maple_pos  # Use position instead of global_position
+	maple.scale = Vector3(0.3, 0.3, 0.3)
+	get_parent().call_deferred("add_child", maple)
+
+	print("ProceduralForestGenerator: Spawned test pickupable objects near player")

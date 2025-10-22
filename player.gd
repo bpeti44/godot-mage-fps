@@ -432,8 +432,8 @@ func _try_pickup():
 	# Add item to inventory
 	var inventory_manager = get_node_or_null("InventoryManager")
 	if inventory_manager:
-		var overflow = inventory_manager.add_item(item, quantity)
-		if overflow == 0:
+		var success = inventory_manager.add_item(item, quantity)
+		if success:
 			print("Picked up %d %s" % [quantity, item.item_name])
 			# Show brief feedback
 			if pickup_prompt:
@@ -443,7 +443,7 @@ func _try_pickup():
 				if current_target_pickupable:
 					pickup_prompt.text = "Press E to pick up " + current_target_pickupable.get_display_name()
 		else:
-			print("Inventory full! Could not pick up all items")
+			print("Inventory full! Could not pick up item")
 	else:
 		print("Pickup failed: No inventory manager found")
 
