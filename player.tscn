@@ -4,16 +4,16 @@
 [ext_resource type="PackedScene" uid="uid://cpyyyo7cr8af7" path="res://skeleton_mage.tscn" id="2_hqtel"]
 [ext_resource type="Texture2D" uid="uid://bg4p70y8syp6e" path="res://demo/assets/textures/Hitmarker-PNG-File.png" id="3_sweqy"]
 [ext_resource type="PackedScene" uid="uid://c5y8qxr2jvw7h" path="res://minimap.tscn" id="4_minimap"]
-[ext_resource type="Script" path="res://inventory_manager.gd" id="5_inventory_manager"]
+[ext_resource type="Script" uid="uid://chc04e2oiuwxy" path="res://inventory_manager.gd" id="5_inventory_manager"]
 [ext_resource type="PackedScene" uid="uid://cgjxpe4v4qbpb" path="res://inventory_ui.tscn" id="6_inventory_ui"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_n766f"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stamina"]
-bg_color = Color(0.133333, 0.545098, 0.133333, 1)
-
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mana"]
 bg_color = Color(0.133333, 0.4, 0.8, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stamina"]
+bg_color = Color(0.133333, 0.545098, 0.133333, 1)
 
 [node name="Player" type="CharacterBody3D" groups=["player"]]
 transform = Transform3D(-0.9998298, 0, -0.018447153, 0, 1, 0, 0.018447153, 0, -0.9998298, 0, 0, 0)
@@ -81,8 +81,7 @@ show_percentage = false
 
 [node name="Minimap" parent="CanvasLayer" instance=ExtResource("4_minimap")]
 
+[node name="InventoryUI" parent="CanvasLayer" instance=ExtResource("6_inventory_ui")]
+
 [node name="InventoryManager" type="Node" parent="."]
 script = ExtResource("5_inventory_manager")
-
-[node name="InventoryUI" parent="CanvasLayer" instance=ExtResource("6_inventory_ui")]
-inventory_manager = NodePath("../../InventoryManager")
