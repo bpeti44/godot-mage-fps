@@ -633,4 +633,3 @@ func _spawn_foliage_type(scene: PackedScene, density: float, type_name: String, 
 			placed += 1
 
 	print("ProceduralForestGenerator: Placed %d %s out of %d target" % [placed, type_name, target_count])
-

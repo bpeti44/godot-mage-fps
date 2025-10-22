@@ -88,6 +88,8 @@ var has_started_jump = false
 var meshes_to_hide: Array[MeshInstance3D] = []
 var stamina_bar: ProgressBar = null
 var mana_bar: ProgressBar = null
+var interaction_raycast: RayCast3D = null
+var pickup_prompt: Label = null
 
 # ORBIT MODE VARIABLES
 var orbiting = false
@@ -96,6 +98,9 @@ var orbit_yaw = 0.0
 var orbit_pitch = 0.0
 
 var spell_spawn_point: Node3D = null
+
+# PICKUP SYSTEM
+var current_target_pickupable = null  # Pickupable reference
 
 
 # -------------------------
@@ -170,6 +175,10 @@ func _ready():
 		mana_bar.max_value = max_mana
 		mana_bar.value = current_mana
 
+	# Get pickup system references
+	interaction_raycast = $Camera3D/InteractionRaycast
+	pickup_prompt = $CanvasLayer/PickupPrompt
+
 
 # -------------------------
 # INPUT HANDLING
@@ -203,6 +212,12 @@ func _unhandled_input(event):
 		get_viewport().set_input_as_handled()
 		return
 	
+	# Handle pickup action
+	if event.is_action_pressed("pickup"):
+		_try_pickup()
+		get_viewport().set_input_as_handled()
+		return
+
 	# Skip camera controls if inventory is open
 	if Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
 		return
@@ -349,6 +364,88 @@ func _on_cast_cooldown_timeout():
 
 func _on_cast_animation_timeout():
 	is_casting = false
+
+# -------------------------
+# PICKUP SYSTEM
+# -------------------------
+func _process(_delta):
+	# Update raycast detection for pickupable objects
+	if interaction_raycast and pickup_prompt:
+		if interaction_raycast.is_colliding():
+			var collider = interaction_raycast.get_collider()
+
+			# Check if the collider or its parent has Pickupable script
+			var pickupable = null  # Will hold Pickupable reference
+
+			# Check the collider itself
+			if collider.has_method("get_display_name"):
+				pickupable = collider
+			# Check the collider's parent
+			elif collider.get_parent() and collider.get_parent().has_method("get_display_name"):
+				pickupable = collider.get_parent()
+			# Check if in pickupable group and search up the tree
+			elif collider.is_in_group("pickupable"):
+				var node = collider
+				while node != null:
+					if node.has_method("get_display_name"):
+						pickupable = node
+						break
+					# Check if node has a child with get_display_name method
+					for child in node.get_children():
+						if child.has_method("get_display_name"):
+							pickupable = child
+							break
+					if pickupable:
+						break
+					node = node.get_parent()
+			else:
+				# Search parent hierarchy for pickupable node
+				var node = collider.get_parent()
+				while node != null and pickupable == null:
+					if node.is_in_group("pickupable") or node.has_method("get_display_name"):
+						pickupable = node
+						break
+					node = node.get_parent()
+
+			if pickupable:
+				current_target_pickupable = pickupable
+				pickup_prompt.text = "Press E to pick up " + pickupable.get_display_name()
+				pickup_prompt.visible = true
+			else:
+				current_target_pickupable = null
+				pickup_prompt.visible = false
+		else:
+			current_target_pickupable = null
+			pickup_prompt.visible = false
+
+func _try_pickup():
+	if current_target_pickupable == null:
+		return
+
+	var item = current_target_pickupable.get_item()
+	var quantity = current_target_pickupable.get_quantity()
+
+	if item == null:
+		print("Pickup failed: No item defined on pickupable object")
+		return
+
+	# Add item to inventory
+	var inventory_manager = get_node_or_null("InventoryManager")
+	if inventory_manager:
+		var overflow = inventory_manager.add_item(item, quantity)
+		if overflow == 0:
+			print("Picked up %d %s" % [quantity, item.item_name])
+			# Show brief feedback
+			if pickup_prompt:
+				pickup_prompt.text = "Collected " + item.item_name + "!"
+				# Reset prompt after a short delay
+				await get_tree().create_timer(0.5).timeout
+				if current_target_pickupable:
+					pickup_prompt.text = "Press E to pick up " + current_target_pickupable.get_display_name()
+		else:
+			print("Inventory full! Could not pick up all items")
+	else:
+		print("Pickup failed: No inventory manager found")
 
 # -------------------------
 # PHYSICS / MOVEMENT
