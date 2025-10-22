@@ -1,0 +1,93 @@
+extends Control
+class_name InventoryUI
+
+## Main inventory UI
+## Displays a 3x3 grid of inventory slots
+
+@export var inventory_manager: Node
+
+@onready var grid_container: GridContainer = $Panel/MarginContainer/GridContainer
+@onready var panel: Panel = $Panel
+
+const SLOT_UI_SCENE = preload("res://inventory_slot_ui.tscn")
+
+func _ready():
+	# Hide by default
+	visible = false
+
+	# Setup grid
+	grid_container.columns = 3
+
+	# Create 9 slot UI elements
+	for i in range(9):
+		var slot_ui = create_slot_ui()
+		grid_container.add_child(slot_ui)
+
+	# Connect to inventory manager if available
+	if inventory_manager:
+		inventory_manager.inventory_changed.connect(_on_inventory_changed)
+
+	update_all_slots()
+
+func _input(event):
+	# Toggle inventory with I key
+	if event.is_action_pressed("toggle_inventory"):
+		toggle_inventory()
+
+func create_slot_ui():
+	# Create slot UI programmatically if scene doesn't exist
+	var slot_ui = Panel.new()
+	slot_ui.custom_minimum_size = Vector2(64, 64)
+
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 4)
+	margin.add_theme_constant_override("margin_right", 4)
+	margin.add_theme_constant_override("margin_top", 4)
+	margin.add_theme_constant_override("margin_bottom", 4)
+	slot_ui.add_child(margin)
+
+	var vbox = VBoxContainer.new()
+	margin.add_child(vbox)
+
+	var icon_rect = TextureRect.new()
+	icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon_rect.custom_minimum_size = Vector2(48, 48)
+	icon_rect.name = "IconRect"
+	vbox.add_child(icon_rect)
+
+	var quantity_label = Label.new()
+	quantity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	quantity_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	quantity_label.name = "QuantityLabel"
+	vbox.add_child(quantity_label)
+
+	# Add script
+	var script = load("res://inventory_slot_ui.gd")
+	slot_ui.set_script(script)
+
+	return slot_ui
+
+func toggle_inventory():
+	visible = !visible
+
+	# Pause/unpause the game when inventory is open
+	if visible:
+		get_tree().paused = true
+		update_all_slots()
+	else:
+		get_tree().paused = false
+
+func update_all_slots():
+	if not inventory_manager:
+		return
+
+	var slot_uis = grid_container.get_children()
+	for i in range(min(slot_uis.size(), 9)):
+		var slot_ui = slot_uis[i]
+		if slot_ui.has_method("set_slot"):
+			slot_ui.set_slot(inventory_manager.get_slot(i), i)
+
+func _on_inventory_changed():
+	if visible:
+		update_all_slots()

@@ -175,16 +175,22 @@ func _ready():
 # INPUT HANDLING
 # -------------------------
 func _unhandled_input(event):
-	
+
+	# Test inventory - Press T to add test items
+	if event is InputEventKey and event.pressed and event.keycode == KEY_T:
+		_test_add_items()
+		get_viewport().set_input_as_handled()
+		return
+
 	# Toggle View (FP / TP)
 	if event.is_action_pressed("toggle_view"):
 		is_first_person = not is_first_person
-		
+
 		# Hide/show meshes: Show in TP mode, hide in FP mode
 		for mesh in meshes_to_hide:
 			if mesh:
 				mesh.visible = not is_first_person
-			
+
 		# Disable orbit mode when switching to FPS
 		if is_first_person:
 			orbiting = false
@@ -517,3 +523,21 @@ func _physics_process(delta):
 				_play_animation("Walking_A")
 		else:
 			_play_animation("Idle")
+
+# -------------------------
+# INVENTORY HELPERS (for testing)
+# -------------------------
+func _test_add_items():
+	var inventory_manager = get_node_or_null("InventoryManager")
+	if inventory_manager:
+		# Load example items
+		var stone = load("res://items/stone.tres")
+		var wood = load("res://items/wood.tres")
+
+		if stone:
+			inventory_manager.add_item(stone, 5)
+			print("Added 5 stones to inventory")
+
+		if wood:
+			inventory_manager.add_item(wood, 3)
+			print("Added 3 wood to inventory")
