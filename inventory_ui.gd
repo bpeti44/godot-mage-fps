@@ -59,9 +59,10 @@ func create_slot_ui():
 	margin.add_child(vbox)
 
 	var icon_rect = TextureRect.new()
-	icon_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon_rect.custom_minimum_size = Vector2(48, 48)
+	icon_rect.modulate = Color(1, 1, 1, 1)  # Full white, full opacity
 	icon_rect.name = "IconRect"
 	vbox.add_child(icon_rect)
 
