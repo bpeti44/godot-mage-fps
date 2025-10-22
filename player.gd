@@ -203,6 +203,10 @@ func _unhandled_input(event):
 		get_viewport().set_input_as_handled()
 		return
 	
+	# Skip camera controls if inventory is open
+	if Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
+		return
+
 	# Existing Orbit and Mouse Movement Input
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_MIDDLE:
@@ -213,13 +217,13 @@ func _unhandled_input(event):
 			else:
 				rotation.y = orbit_yaw
 				rotation_x = orbit_pitch
-				
+
 				# Restore the base tilt (TP) or vertical rotation (FP) after orbit is disabled
 				if not is_first_person:
 					camera.rotation_degrees.x = rotation_x + TP_BASE_ROTATION_X
 				else:
 					camera.rotation_degrees.x = rotation_x
-				
+
 
 	if event is InputEventMouseMotion:
 		if orbiting:

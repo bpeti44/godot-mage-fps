@@ -86,12 +86,12 @@ func create_slot_ui():
 func toggle_inventory():
 	visible = !visible
 
-	# Pause/unpause the game when inventory is open
+	# Show/hide mouse cursor when inventory is open
 	if visible:
-		get_tree().paused = true
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		update_all_slots()
 	else:
-		get_tree().paused = false
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func update_all_slots():
 	if not inventory_manager:
