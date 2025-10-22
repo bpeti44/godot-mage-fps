@@ -28,6 +28,12 @@ shape = SubResource("BoxShape3D_n766f")
 
 [node name="Camera3D" type="Camera3D" parent="."]
 
+[node name="InteractionRaycast" type="RayCast3D" parent="Camera3D"]
+target_position = Vector3(0, 0, -5)
+collision_mask = 1
+collide_with_areas = false
+collide_with_bodies = true
+
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 
 [node name="CenterContainer" type="CenterContainer" parent="CanvasLayer"]
@@ -86,3 +92,21 @@ script = ExtResource("5_inventory_manager")
 
 [node name="InventoryUI" parent="CanvasLayer" instance=ExtResource("6_inventory_ui")]
 inventory_manager = NodePath("../../InventoryManager")
+
+[node name="PickupPrompt" type="Label" parent="CanvasLayer"]
+visible = false
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -200.0
+offset_top = -100.0
+offset_right = 200.0
+offset_bottom = -50.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_font_sizes/font_size = 24
+text = "Press E to pick up Item"
+horizontal_alignment = 1
+vertical_alignment = 1
