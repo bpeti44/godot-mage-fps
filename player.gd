@@ -85,11 +85,22 @@ var is_jumping = false
 var has_started_jump = false
 
 # NODE REFERENCES
-var meshes_to_hide: Array[MeshInstance3D] = []
 var stamina_bar: ProgressBar = null
 var mana_bar: ProgressBar = null
 var interaction_raycast: RayCast3D = null
 var pickup_prompt: Label = null
+
+# -------------------------
+# RENDER LAYER CONSTANTS
+# -------------------------
+# Layer system for FP/TP mesh visibility
+const LAYER_DEFAULT = 1  # Layer 1: World objects, terrain, etc.
+const LAYER_FP_VISIBLE = 2  # Layer 2: Arms, legs, lower body (visible in FP)
+const LAYER_FP_HIDDEN = 3  # Layer 3: Head, upper body (hidden in FP, shadows only)
+
+# Camera cull masks (bitwise)
+const CULL_MASK_FP = (1 << 0) | (1 << 1)  # Layers 1 & 2
+const CULL_MASK_TP = (1 << 0) | (1 << 1) | (1 << 2)  # Layers 1, 2 & 3
 
 # ORBIT MODE VARIABLES
 var orbiting = false
@@ -130,27 +141,23 @@ func _ready():
 	# Find the spell spawn point (BoneAttachment3D)
 	spell_spawn_point = $"skeleton_mage/Rig/Skeleton3D/SpellSpawn"
 
-	# Automatic mesh collection and exclusion for FP view
+	# Configure render layers for FP/TP mesh visibility
 	var skeleton_node = $"skeleton_mage/Rig/Skeleton3D"
-	var meshes_to_keep: Array[String] = [
+
+	# Meshes visible in FP (only arms and legs)
+	var fp_visible_meshes: Array[String] = [
 		"Skeleton_Mage_ArmLeft",
 		"Skeleton_Mage_ArmRight",
 		"Skeleton_Mage_LegLeft",
 		"Skeleton_Mage_LegRight"
 	]
 
-	# Recursively collect all MeshInstance3D nodes
-	for child in skeleton_node.get_children():
-		# Handle the head attached under a 'head' BoneAttachment
-		if child.name == "head" and child is Node:
-			for head_child in child.get_children():
-				if head_child is MeshInstance3D and head_child.name not in meshes_to_keep:
-					meshes_to_hide.append(head_child)
-		
-		# All other direct children of Skeleton3D
-		if child is MeshInstance3D and child.name not in meshes_to_keep:
-			meshes_to_hide.append(child)
-			
+	# Recursively set render layers for all MeshInstance3D nodes
+	_configure_mesh_layers(skeleton_node, fp_visible_meshes)
+
+	# Initialize mesh visibility based on starting view mode (default: TP)
+	_update_mesh_visibility(is_first_person)
+
 	# Find the AnimationPlayer
 	if has_node("Skeleton_Mage/AnimationPlayer"):
 		animation_player = $Skeleton_Mage/AnimationPlayer
@@ -195,14 +202,12 @@ func _unhandled_input(event):
 	if event.is_action_pressed("toggle_view"):
 		is_first_person = not is_first_person
 
-		# Hide/show meshes: Show in TP mode, hide in FP mode
-		for mesh in meshes_to_hide:
-			if mesh:
-				mesh.visible = not is_first_person
-
-		# Disable orbit mode when switching to FPS
+		# Update mesh visibility based on view mode (keep cull_mask at all layers)
 		if is_first_person:
-			orbiting = false
+			orbiting = false  # Disable orbit mode in FPS
+			_update_mesh_visibility(true)  # FP: hide Layer 3, keep shadows
+		else:
+			_update_mesh_visibility(false)  # TP: show all meshes
 		get_viewport().set_input_as_handled()
 		return
 
@@ -650,3 +655,72 @@ func _test_add_items():
 		if wood:
 			inventory_manager.add_item(wood, 3)
 			print("Added 3 wood to inventory")
+
+# -------------------------
+# RENDER LAYER HELPER FUNCTIONS
+# -------------------------
+
+## Configure render layers for all mesh instances in the skeleton
+## FP_Visible meshes go to Layer 2, others to Layer 3
+func _configure_mesh_layers(node: Node, fp_visible_names: Array[String]):
+	for child in node.get_children():
+		# Handle head BoneAttachment (contains hat, skull meshes)
+		if child.name == "head" and child is Node:
+			for head_child in child.get_children():
+				if head_child is MeshInstance3D:
+					_set_mesh_layer(head_child, LAYER_FP_HIDDEN)
+
+		# Handle regular mesh children
+		if child is MeshInstance3D:
+			if child.name in fp_visible_names:
+				_set_mesh_layer(child, LAYER_FP_VISIBLE)
+			else:
+				_set_mesh_layer(child, LAYER_FP_HIDDEN)
+
+		# Recurse into children
+		if child.get_child_count() > 0:
+			_configure_mesh_layers(child, fp_visible_names)
+
+## Set mesh to specific render layer (shadow settings handled separately)
+func _set_mesh_layer(mesh: MeshInstance3D, layer: int):
+	# Set the visual layer (1-based index becomes 0-based bit)
+	mesh.layers = 1 << (layer - 1)
+
+	# Debug output
+	print("Set mesh '%s' to layer %d" % [mesh.name, layer])
+
+## Update mesh visibility based on view mode
+## FP mode: Layer 3 meshes invisible but cast shadows
+## TP mode: All meshes visible
+func _update_mesh_visibility(fp_mode: bool):
+	var skeleton_node = $"skeleton_mage/Rig/Skeleton3D"
+	_set_visibility_recursive(skeleton_node, fp_mode)
+
+## Recursively update visibility for all meshes
+func _set_visibility_recursive(node: Node, fp_mode: bool):
+	for child in node.get_children():
+		if child is MeshInstance3D:
+			# Check which layer this mesh is on
+			var on_layer_3 = (child.layers & (1 << 2)) != 0  # Layer 3 bit
+
+			if on_layer_3:
+				# Layer 3 meshes: use transparency in FP to preserve shadows
+				child.visible = true  # Keep visible for shadow casting
+				child.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+
+				# Make invisible via transparency in FP mode
+				if fp_mode:
+					child.transparency = 1.0  # Fully transparent
+					print("Set '%s' transparent (shadow: ON)" % child.name)
+				else:
+					child.transparency = 0.0  # Opaque
+					print("Set '%s' opaque (shadow: ON)" % child.name)
+			else:
+				# Layer 1 & 2 meshes: always visible and opaque
+				child.visible = true
+				child.transparency = 0.0
+				child.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+
+		# Recurse into children
+		if child.get_child_count() > 0:
+			_set_visibility_recursive(child, fp_mode)
